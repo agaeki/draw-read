@@ -1,0 +1,12 @@
+[package]
+name = "screen_reader_1"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ocrs = { git = "https://github.com/robertknight/ocrs.git" }
+screenshots = "*"
+rten = "*"
+xilem = "*"
