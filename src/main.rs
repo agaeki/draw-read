@@ -1,12 +1,9 @@
 
-use winit::window::WindowButtons;
-use winit::window::Window;
-use winit::window::WindowLevel;
-use xilem::view::button;
-use xilem::Xilem;
-use xilem::MasonryView;
+use eframe::egui::{self};
+
 use std::fs;
-use std::error::Error;use ocrs::OcrEngine;
+use std::error::Error;
+use ocrs::OcrEngine;
 use ocrs::OcrEngineParams;
 use ocrs::ImageSource;
 
@@ -15,67 +12,36 @@ use mouse_position::mouse_position::{Mouse};
 use rten::Model;
 use rten_imageproc::RotatedRect;
 
-struct AppData {
-    to_read: String,
-    read_position: Point
-    engine: OcrEngine,
-    previous_strings: Vec<StrToRead>
-}
-
 #[derive(Clone, Debug)]
 struct StrToRead {
     position: RotatedRect,
     str: String
 }
 
+#[derive(Default)]
+struct App {
+    to_read: String,
+    read_position: (f32,f32),
+    engine: Option<OcrEngine>,
+    previous_strings: Vec<StrToRead>
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating UI");
 
-    println!("Opening detection data");
-    // Use the `download-models.sh` script to download the models.
-    let detection_model_data = fs::read("F:/Projects/rust/ocrs/ocrs/examples/text-detection.rten")?;
-    let rec_model_data = fs::read("F:/Projects/rust/ocrs/ocrs/examples/text-recognition.rten")?;
-
-    let detection_model = Model::load(&detection_model_data)?;
-    let recognition_model = Model::load(&rec_model_data)?;
-
-println!("Initialising OCR engine");
-    let engine = OcrEngine::new(OcrEngineParams {
-        detection_model: Some(detection_model),
-        recognition_model: Some(recognition_model),
+    let options = eframe::NativeOptions {
+        renderer: eframe::Renderer::Wgpu,
         ..Default::default()
-    })?;
-
-    let data = AppData {
-        to_read: "Hello I'm reading the screen".to_string(),
-        engine: engine,
-        previous_strings: vec!()
     };
-
-    let app = Xilem::new(data, app_logic);
-    let window_attributes = Window::default_attributes()
-        .with_resizable(false)
-        .with_decorations(false)
-        .with_enabled_buttons(WindowButtons::empty())
-        .with_window_level(WindowLevel::AlwaysOnTop);
-    app.run_windowed_in(window_attributes).unwrap();
-
-    Ok(())
+    Ok(eframe::run_native(
+        "screen_reader_1",
+        options,
+        Box::new(|_cc| Box::<App>::default()),
+    )?)
 }
 
-fn read(data: String) {
+fn read(data: &String) {
     println!("Reading '{:?}'", data)
-}
-
-fn app_logic(data: &mut AppData) -> impl MasonryView<AppData> {
-    let mut strings = get_strings(&data.engine).unwrap();
-    data.to_read = strings[0].str.clone();
-
-    let mouse_pos = Mouse::get_mouse_position();
-    let closest_str = get_closest_rect(&mut strings, mouse_pos);
-    data.to_read = closest_str.str.clone();
-
-    button("READ", |data: &mut AppData| read(data.to_read.clone()))
 }
 
 fn get_strings(engine: &OcrEngine) -> Result<Vec<StrToRead>, Box<dyn Error>> {
@@ -83,7 +49,7 @@ fn get_strings(engine: &OcrEngine) -> Result<Vec<StrToRead>, Box<dyn Error>> {
     let screen = Screen::all().unwrap()[1];
 
     println!("Screen: {screen:?}");
-    let mut rgb_image = screen.capture().unwrap();
+    let rgb_image = screen.capture().unwrap();
     let img_source = ImageSource::from_bytes(rgb_image.as_raw(), rgb_image.dimensions())?;
     let ocr_input = engine.prepare_input(img_source)?;
     
@@ -128,22 +94,47 @@ fn get_closest_rect(rects: &mut Vec<StrToRead>, position: Mouse) -> StrToRead {
     }
 }
 
-struct WindowMover;
+impl eframe::App for App {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if self.engine.is_none() {
 
-impl<W: Widget<AppState>> WindowMover<AppState, W> for EventLogger {
-    fn event(
-        &mut self,
-        child: &mut W,
-        ctx: &mut EventCtx,
-        event: &Event,
-        data: &mut AppState,
-        env: &Env,
-    ) {
-        if let Event::MouseMove(mouse_event) = event {
-            ctx.window().set_position(data.)
+        println!("Opening detection data");
+        // Use the `download-models.sh` script to download the models.
+        let detection_model_data = fs::read("F:/Projects/rust/ocrs/ocrs/examples/text-detection.rten").unwrap();
+        let rec_model_data = fs::read("F:/Projects/rust/ocrs/ocrs/examples/text-recognition.rten").unwrap();
+
+        let detection_model = Model::load(&detection_model_data).unwrap();
+        let recognition_model = Model::load(&rec_model_data).unwrap();
+
+    println!("Initialising OCR engine");
+        self.engine = Some(OcrEngine::new(OcrEngineParams {
+            detection_model: Some(detection_model),
+            recognition_model: Some(recognition_model),
+            ..Default::default()
+        }).unwrap());
         }
 
-        // Always pass on the event!
-        child.event(ctx, event, data, env)
+        println!("Getting strings");
+        let mut strings = get_strings(&self.engine.as_ref().unwrap()).unwrap();
+
+        println!("Finding closest string");
+        let mouse_pos = Mouse::get_mouse_position();
+        let closest_str = get_closest_rect(&mut strings, mouse_pos);
+        self.read_position = (closest_str.position.corners()[0].x - 50., closest_str.position.corners()[0].y);
+        self.to_read = closest_str.str.clone();
+
+        println!("Creating window at {:?}", self.read_position);
+        egui::Window::new("screen_reader_1")
+            .movable(false)
+            .fixed_pos(self.read_position)
+            .fixed_size((500.,100.))
+            .title_bar(false)
+            .show(ctx, |ui| {
+                if ui.button("read").clicked() {
+                    read(&self.to_read);
+                }
+
+                ctx.request_repaint();
+            });
     }
 }
