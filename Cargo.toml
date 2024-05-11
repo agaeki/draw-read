@@ -11,6 +11,8 @@ screenshots = "*"
 rten = "*"
 rten-imageproc = "*"
 mouse_position = "*"
-egui = "*"
-eframe = { version = "*", features = ["wgpu"]}
-env_logger = "*"
+glium = { version = "*", default-features = true }
+imgui = "*"
+imgui-glium-renderer = "*"
+imgui-winit-support = "*"
+winit = "*"
