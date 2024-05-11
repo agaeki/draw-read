@@ -1,4 +1,7 @@
 
+use winit::window::WindowButtons;
+use winit::window::Window;
+use winit::window::WindowLevel;
 use xilem::view::button;
 use xilem::Xilem;
 use xilem::MasonryView;
@@ -8,16 +11,20 @@ use ocrs::OcrEngineParams;
 use ocrs::ImageSource;
 
 use screenshots::Screen;
-
+use mouse_position::mouse_position::{Mouse};
 use rten::Model;
+use rten_imageproc::RotatedRect;
 
 struct AppData {
     to_read: String,
-    engine: OcrEngine
+    read_position: Point
+    engine: OcrEngine,
+    previous_strings: Vec<StrToRead>
 }
 
+#[derive(Clone, Debug)]
 struct StrToRead {
-    position: u8,
+    position: RotatedRect,
     str: String
 }
 
@@ -41,32 +48,45 @@ println!("Initialising OCR engine");
 
     let data = AppData {
         to_read: "Hello I'm reading the screen".to_string(),
-        engine: engine
+        engine: engine,
+        previous_strings: vec!()
     };
 
     let app = Xilem::new(data, app_logic);
-    app.run_windowed("First Example".into()).unwrap();
+    let window_attributes = Window::default_attributes()
+        .with_resizable(false)
+        .with_decorations(false)
+        .with_enabled_buttons(WindowButtons::empty())
+        .with_window_level(WindowLevel::AlwaysOnTop);
+    app.run_windowed_in(window_attributes).unwrap();
 
     Ok(())
 }
 
 fn read(data: String) {
+    println!("Reading '{:?}'", data)
 }
 
 fn app_logic(data: &mut AppData) -> impl MasonryView<AppData> {
+    let mut strings = get_strings(&data.engine).unwrap();
+    data.to_read = strings[0].str.clone();
+
+    let mouse_pos = Mouse::get_mouse_position();
+    let closest_str = get_closest_rect(&mut strings, mouse_pos);
+    data.to_read = closest_str.str.clone();
+
     button("READ", |data: &mut AppData| read(data.to_read.clone()))
 }
 
 fn get_strings(engine: &OcrEngine) -> Result<Vec<StrToRead>, Box<dyn Error>> {
 
-    let screens = Screen::all().unwrap();
+    let screen = Screen::all().unwrap()[1];
 
-    for screen in screens {
-        println!("Screen: {screen:?}");
-        let mut rgb_image = screen.capture().unwrap();
-        let img_source = ImageSource::from_bytes(rgb_image.as_raw(), rgb_image.dimensions())?;
-        let ocr_input = engine.prepare_input(img_source)?;
-        
+    println!("Screen: {screen:?}");
+    let mut rgb_image = screen.capture().unwrap();
+    let img_source = ImageSource::from_bytes(rgb_image.as_raw(), rgb_image.dimensions())?;
+    let ocr_input = engine.prepare_input(img_source)?;
+    
     // Get oriented bounding boxes of text words in input image.
     let word_rects = engine.detect_words(&ocr_input)?;
 
@@ -77,16 +97,53 @@ fn get_strings(engine: &OcrEngine) -> Result<Vec<StrToRead>, Box<dyn Error>> {
     // Recognize the characters in each line.
     let line_texts = engine.recognize_text(&ocr_input, &line_rects)?;
 
-    for line in line_texts
-        .iter()
-        .flatten()
+    Ok(line_rects.into_iter().flatten().zip(line_texts.into_iter().flatten())
         // Filter likely spurious detections. With future model improvements
         // this should become unnecessary.
-        .filter(|l| l.to_string().len() > 1)
-    {
-        println!("{}", line);
+        .filter(|l| l.1.to_string().len() > 1)
+        .map(|(rect, line)| StrToRead{
+            position: rect,
+            str: line.to_string()
+        })
+        .collect::<Vec<_>>())
+
+}
+
+fn get_closest_rect(rects: &mut Vec<StrToRead>, position: Mouse) -> StrToRead {
+    match position{
+        Mouse::Position{x,y} => {rects.sort_by(|rect1, rect2| {
+                let corner1 = rect1.position.corners()[0];
+                let vec1: (i32, i32) = (corner1.x as i32 - x, corner1.y as i32 - y);
+                let mag1 = vec1.0.pow(2) + vec1.1.pow(2);
+
+                let corner2 = rect2.position.corners()[0];
+                let vec2: (i32, i32) = (corner2.x as i32 - x, corner2.y as i32 - y);
+                let mag2 = vec2.0.pow(2) + vec2.1.pow(2);
+
+                mag1.cmp( &mag2)
+            });
+        rects[0].clone()
+    },
+        _ => panic!("Mouse position error!")
     }
 }
-    Ok(vec!())
 
+struct WindowMover;
+
+impl<W: Widget<AppState>> WindowMover<AppState, W> for EventLogger {
+    fn event(
+        &mut self,
+        child: &mut W,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut AppState,
+        env: &Env,
+    ) {
+        if let Event::MouseMove(mouse_event) = event {
+            ctx.window().set_position(data.)
+        }
+
+        // Always pass on the event!
+        child.event(ctx, event, data, env)
+    }
 }

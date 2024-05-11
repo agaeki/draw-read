@@ -9,4 +9,7 @@ edition = "2021"
 ocrs = { git = "https://github.com/robertknight/ocrs.git" }
 screenshots = "*"
 rten = "*"
+rten-imageproc = "*"
 xilem = "*"
+mouse_position = "*"
+winit = "*"
