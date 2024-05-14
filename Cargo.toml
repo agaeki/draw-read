@@ -16,3 +16,12 @@ imgui = "*"
 imgui-glium-renderer = "*"
 imgui-winit-support = "*"
 winit = "*"
+
+[target.'cfg(windows)'.dependencies]
+native-windows-gui = "*"
+native-windows-derive = "*" # Optional. Only if the derive macro is used.
+windows = { version = "*", features = [ "Win32_UI", "Win32_UI_WindowsAndMessaging" ] }
+winapi = "*"
+
+[build-dependencies]
+embed-manifest = "*"
