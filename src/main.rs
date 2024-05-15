@@ -2,17 +2,14 @@ extern crate native_windows_derive as nwd;
 extern crate native_windows_gui as nwg;
 
 use crate::nwg::NativeUi;
-use crate::nwg::WindowFlags;
 use rten_imageproc::RotatedRect;
 use std::rc::Rc;
-use winapi::um::winuser::WS_BORDER;
-use winapi::um::winuser::WS_EX_TOOLWINDOW;
-use winapi::um::winuser::WS_EX_TOPMOST;
+use tts::*;
 
 use ocrs::ImageSource;
 use ocrs::OcrEngine;
 use ocrs::OcrEngineParams;
-use std::error::Error;
+use std::error::Error as StdError;
 use std::fs;
 
 use mouse_position::mouse_position::Mouse;
@@ -63,11 +60,13 @@ impl nwg::NativeUi<BasicAppUi> for App {
 
         // Events
         let evt_ui = Rc::downgrade(&ui.inner);
-        let handle_events = move |evt, _evt_data, handle| {
+        let handle_events = move |evt, _evt_data, _handle| {
             if let Some(ui) = evt_ui.upgrade() {
                 match evt {
                     E::OnButtonClick => {
-                        read(&ui.to_read.borrow());
+                        if let Some(ref mut inner_tts) = *ui.tts.borrow_mut() {
+                            read(&ui.to_read.borrow(), inner_tts);
+                        }
                     }
                     E::OnWindowClose => {
                         nwg::stop_thread_dispatch();
@@ -76,6 +75,7 @@ impl nwg::NativeUi<BasicAppUi> for App {
                         //println!("Timer ticked for {:?} {:?}", handle, ui.window.handle);
                         let new_position = update_and_get_new_position(
                             &mut ui.engine.borrow_mut(),
+                            &mut ui.tts.borrow_mut(),
                             &mut ui.read_position.borrow_mut(),
                             &mut ui.to_read.borrow_mut(),
                         );
@@ -120,6 +120,7 @@ pub struct App {
     pub to_read: RefCell<String>,
     pub read_position: RefCell<(f32, f32)>,
     pub engine: RefCell<Option<OcrEngine>>,
+    pub tts: RefCell<Option<Tts>>,
     pub previous_strings: Vec<StrToRead>,
 
     window: nwg::Window,
@@ -134,20 +135,51 @@ pub struct StrToRead {
     pub str: String,
 }
 
-fn main() {
+fn main() -> Result<(), Error> {
+    let mut tts = Tts::default()?;
+    if Tts::screen_reader_available() {
+        println!("A screen reader is available on this platform.");
+    } else {
+        println!("No screen reader is available on this platform.");
+    }
+    let Features {
+        utterance_callbacks,
+        ..
+    } = tts.supported_features();
+    if utterance_callbacks {
+        tts.on_utterance_begin(Some(Box::new(|utterance| {
+            println!("Started speaking {:?}", utterance)
+        })))?;
+        tts.on_utterance_end(Some(Box::new(|utterance| {
+            println!("Finished speaking {:?}", utterance)
+        })))?;
+        tts.on_utterance_stop(Some(Box::new(|utterance| {
+            println!("Stopped speaking {:?}", utterance)
+        })))?;
+    }
+    let Features { is_speaking, .. } = tts.supported_features();
+    if is_speaking {
+        println!("Are we speaking? {}", tts.is_speaking()?);
+    }
+    tts.speak("Hello, world.", false)?;
+
     println!("Creating UI");
     nwg::init().expect("Failed to init Native Windows GUI");
 
     let _built_gui = App::build_ui(App::default()).expect("Failed to build UI");
 
     nwg::dispatch_thread_events();
+
+    Ok(())
 }
 
-fn read(data: &String) {
-    println!("Reading '{:?}'", data)
+fn read(data: &String, tts: &mut Tts) {
+    println!("Speaking '{:?}'", data);
+
+    tts.speak(data, false).unwrap();
 }
 
-fn get_strings(engine: &OcrEngine) -> Result<Vec<StrToRead>, Box<dyn Error>> {
+fn get_strings(engine: &OcrEngine) -> Result<Vec<StrToRead>, Box<dyn StdError>> {
     let screen = Screen::all().unwrap()[0];
 
     //println!("Screen: {screen:?}");
@@ -200,6 +232,7 @@ fn get_closest_rect(rects: &mut Vec<StrToRead>, position: Mouse) -> StrToRead {
 
 fn update_and_get_new_position(
     engine: &mut Option<OcrEngine>,
+    tts: &mut Option<Tts>,
     read_position: &mut (f32, f32),
     to_read: &mut String,
 ) -> (f32, f32) {
@@ -223,6 +256,43 @@ fn update_and_get_new_position(
             })
             .unwrap(),
         );
+    }
+
+    if tts.is_none() {
+        println!("Initialising reader");
+        let mut inner_tts = Tts::default().expect("Failed to start Text-to-Speech");
+        if Tts::screen_reader_available() {
+            println!("A screen reader is available on this platform.");
+        } else {
+            println!("No screen reader is available on this platform.");
+        }
+        let Features {
+            utterance_callbacks,
+            ..
+        } = inner_tts.supported_features();
+        if utterance_callbacks {
+            inner_tts
+                .on_utterance_begin(Some(Box::new(|utterance| {
+                    println!("Started speaking {:?}", utterance)
+                })))
+                .unwrap();
+            inner_tts
+                .on_utterance_end(Some(Box::new(|utterance| {
+                    println!("Finished speaking {:?}", utterance)
+                })))
+                .unwrap();
+            inner_tts
+                .on_utterance_stop(Some(Box::new(|utterance| {
+                    println!("Stopped speaking {:?}", utterance)
+                })))
+                .unwrap();
+        }
+        let Features { is_speaking, .. } = inner_tts.supported_features();
+        if is_speaking {
+            println!("Are we speaking? {}", inner_tts.is_speaking().unwrap());
+        }
+        inner_tts.speak("Hello, world.", false).unwrap();
+        *tts = Some(inner_tts);
     }
 
     //println!("Getting strings");

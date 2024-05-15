@@ -16,6 +16,7 @@ imgui = "*"
 imgui-glium-renderer = "*"
 imgui-winit-support = "*"
 winit = "*"
+tts = "*"
 
 [target.'cfg(windows)'.dependencies]
 native-windows-gui = "*"
