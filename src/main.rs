@@ -2,9 +2,12 @@ extern crate native_windows_derive as nwd;
 extern crate native_windows_gui as nwg;
 
 use crate::nwg::NativeUi;
-use crate::nwg::Timer;
+use crate::nwg::WindowFlags;
 use rten_imageproc::RotatedRect;
 use std::rc::Rc;
+use winapi::um::winuser::WS_BORDER;
+use winapi::um::winuser::WS_EX_TOOLWINDOW;
+use winapi::um::winuser::WS_EX_TOPMOST;
 
 use ocrs::ImageSource;
 use ocrs::OcrEngine;
@@ -32,14 +35,16 @@ impl nwg::NativeUi<BasicAppUi> for App {
 
         // Controls
         nwg::Window::builder()
-            .flags(nwg::WindowFlags::VISIBLE)
-            .size((60, 25))
+            .ex_flags(0)
+            .topmost(true)
+            .size((85, 45))
             .position((300, 300))
             .title("")
             .build(&mut data.window)?;
 
         nwg::Button::builder()
             .text("Read")
+            .position((0, 0))
             .parent(&data.window)
             .build(&mut data.read_button)?;
 
@@ -62,14 +67,10 @@ impl nwg::NativeUi<BasicAppUi> for App {
             if let Some(ui) = evt_ui.upgrade() {
                 match evt {
                     E::OnButtonClick => {
-                        if &handle == &ui.read_button {
-                            read(&ui.to_read.borrow());
-                        }
+                        read(&ui.to_read.borrow());
                     }
                     E::OnWindowClose => {
-                        if &handle == &ui.window {
-                            nwg::stop_thread_dispatch();
-                        }
+                        nwg::stop_thread_dispatch();
                     }
                     E::OnTimerTick => {
                         //println!("Timer ticked for {:?} {:?}", handle, ui.window.handle);
@@ -162,21 +163,17 @@ fn get_strings(engine: &OcrEngine) -> Result<Vec<StrToRead>, Box<dyn Error>> {
     // bounding boxes.
     let line_rects = engine.find_text_lines(&ocr_input, &word_rects);
 
-    // Recognize the characters in each line.
-    let line_texts = engine.recognize_text(&ocr_input, &line_rects)?;
-
+    // Recognise the words in each line and match the string to the line position
     Ok(line_rects
         .into_iter()
-        .flatten()
-        .zip(line_texts.into_iter().flatten())
-        // Filter likely spurious detections. With future model improvements
-        // this should become unnecessary.
-        .filter(|l| l.1.to_string().len() > 5)
-        .map(|(rect, line)| StrToRead {
-            position: rect,
-            str: line.to_string(),
+        .map(|line| StrToRead {
+            position: line[0],
+            str: engine.recognize_text(&ocr_input, &[line]).unwrap()[0]
+                .clone()
+                .map_or("".to_string(), |x| x.to_string()),
         })
-        .collect::<Vec<_>>())
+        .filter(|str_to_read| str_to_read.str.len() > 5)
+        .collect())
 }
 
 fn get_closest_rect(rects: &mut Vec<StrToRead>, position: Mouse) -> StrToRead {
@@ -230,16 +227,6 @@ fn update_and_get_new_position(
 
     //println!("Getting strings");
     let mut strings = get_strings(engine.as_ref().unwrap()).unwrap();
-    for string in strings.iter() {
-        println!(
-            "String is {:?} at {:?} {:?} {:?} {:?}",
-            string.str,
-            string.position.center(),
-            string.position.up_axis(),
-            string.position.width(),
-            string.position.height()
-        );
-    }
 
     //println!("Finding closest string");
     let mouse_pos = Mouse::get_mouse_position();
@@ -249,13 +236,23 @@ fn update_and_get_new_position(
         closest_str.str,
         closest_str.position.center()
     );
-    *read_position = (
-        closest_str.position.center().x - 50.,
-        closest_str.position.center().y,
-    );
+
+    let x_pos = if (closest_str.position.center().x - 60.) < 0.0 {
+        closest_str.position.center().x
+    } else {
+        closest_str.position.center().x - 60.0
+    };
+
+    let y_pos = if (closest_str.position.center().x - 60.) < 0.0 {
+        closest_str.position.center().y + 25.0
+    } else {
+        closest_str.position.center().y
+    };
+
+    *read_position = (x_pos, y_pos);
     *to_read = closest_str.str.clone();
 
-    //println!("Creating window at {:?}", read_position);
+    println!("Creating window at {:?}", read_position);
     (read_position.0, read_position.1)
 }
 
