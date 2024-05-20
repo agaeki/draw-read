@@ -7,20 +7,16 @@ edition = "2021"
 
 [dependencies]
 ocrs = { git = "https://github.com/robertknight/ocrs.git" }
-screenshots = "*"
+image = {version = "*", features=["bmp"]}
+xcap = "*"
 rten = "*"
 rten-imageproc = "*"
 mouse_position = "*"
-glium = { version = "*", default-features = true }
-imgui = "*"
-imgui-glium-renderer = "*"
-imgui-winit-support = "*"
-winit = "*"
 tts = "*"
 
 [target.'cfg(windows)'.dependencies]
-native-windows-gui = "*"
-native-windows-derive = "*" # Optional. Only if the derive macro is used.
+native-windows-gui = { path = "../native-windows-gui/native-windows-gui", features = ["image-decoder"]}
+native-windows-derive = { path = "../native-windows-gui/native-windows-derive" }
 windows = { version = "*", features = [ "Win32_UI", "Win32_UI_WindowsAndMessaging" ] }
 winapi = "*"
 

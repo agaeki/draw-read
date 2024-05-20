@@ -1,9 +1,9 @@
 extern crate native_windows_derive as nwd;
 extern crate native_windows_gui as nwg;
 
+use crate::app_logic::App;
+use crate::app_logic::StrToRead;
 use crate::nwg::NativeUi;
-use rten_imageproc::RotatedRect;
-use std::rc::Rc;
 use tts::*;
 
 use ocrs::ImageSource;
@@ -14,159 +14,16 @@ use std::fs;
 
 use mouse_position::mouse_position::Mouse;
 use rten::Model;
-use screenshots::Screen;
 
-use std::cell::RefCell;
-use std::ops::Deref;
-
+mod app_logic;
+mod basic_ui;
 mod timer;
 
-pub struct BasicAppUi {
-    inner: Rc<App>,
-    default_handler: RefCell<Option<nwg::EventHandler>>,
-}
-
-impl nwg::NativeUi<BasicAppUi> for App {
-    fn build_ui(mut data: App) -> Result<BasicAppUi, nwg::NwgError> {
-        use nwg::Event as E;
-
-        // Controls
-        nwg::Window::builder()
-            .ex_flags(0)
-            .topmost(true)
-            .size((85, 45))
-            .position((300, 300))
-            .title("")
-            .build(&mut data.window)?;
-
-        nwg::Button::builder()
-            .text("Read")
-            .position((0, 0))
-            .parent(&data.window)
-            .build(&mut data.read_button)?;
-
-        #[allow(deprecated)]
-        let _ = nwg::Timer::builder()
-            .parent(&data.window)
-            .interval(1000)
-            .stopped(false)
-            .build(&mut data.timer);
-
-        // Wrap-up
-        let ui = BasicAppUi {
-            inner: Rc::new(data),
-            default_handler: Default::default(),
-        };
-
-        // Events
-        let evt_ui = Rc::downgrade(&ui.inner);
-        let handle_events = move |evt, _evt_data, _handle| {
-            if let Some(ui) = evt_ui.upgrade() {
-                match evt {
-                    E::OnButtonClick => {
-                        if let Some(ref mut inner_tts) = *ui.tts.borrow_mut() {
-                            read(&ui.to_read.borrow(), inner_tts);
-                        }
-                    }
-                    E::OnWindowClose => {
-                        nwg::stop_thread_dispatch();
-                    }
-                    E::OnTimerTick => {
-                        //println!("Timer ticked for {:?} {:?}", handle, ui.window.handle);
-                        let new_position = update_and_get_new_position(
-                            &mut ui.engine.borrow_mut(),
-                            &mut ui.tts.borrow_mut(),
-                            &mut ui.read_position.borrow_mut(),
-                            &mut ui.to_read.borrow_mut(),
-                        );
-
-                        ui.window
-                            .set_position(new_position.0 as i32, new_position.1 as i32);
-                    }
-                    _ => {}
-                }
-            }
-        };
-
-        *ui.default_handler.borrow_mut() = Some(nwg::full_bind_event_handler(
-            &ui.window.handle,
-            handle_events,
-        ));
-
-        return Ok(ui);
-    }
-}
-
-impl Drop for BasicAppUi {
-    /// To make sure that everything is freed without issues, the default handler must be unbound.
-    fn drop(&mut self) {
-        let handler = self.default_handler.borrow();
-        if handler.is_some() {
-            nwg::unbind_event_handler(handler.as_ref().unwrap());
-        }
-    }
-}
-
-impl Deref for BasicAppUi {
-    type Target = App;
-
-    fn deref(&self) -> &App {
-        &self.inner
-    }
-}
-
-#[derive(Default)]
-pub struct App {
-    pub to_read: RefCell<String>,
-    pub read_position: RefCell<(f32, f32)>,
-    pub engine: RefCell<Option<OcrEngine>>,
-    pub tts: RefCell<Option<Tts>>,
-    pub previous_strings: Vec<StrToRead>,
-
-    window: nwg::Window,
-    read_button: nwg::Button,
-    #[allow(deprecated)]
-    timer: nwg::Timer,
-}
-
-#[derive(Clone, Debug)]
-pub struct StrToRead {
-    pub position: RotatedRect,
-    pub str: String,
-}
-
 fn main() -> Result<(), Error> {
-    let mut tts = Tts::default()?;
-    if Tts::screen_reader_available() {
-        println!("A screen reader is available on this platform.");
-    } else {
-        println!("No screen reader is available on this platform.");
-    }
-    let Features {
-        utterance_callbacks,
-        ..
-    } = tts.supported_features();
-    if utterance_callbacks {
-        tts.on_utterance_begin(Some(Box::new(|utterance| {
-            println!("Started speaking {:?}", utterance)
-        })))?;
-        tts.on_utterance_end(Some(Box::new(|utterance| {
-            println!("Finished speaking {:?}", utterance)
-        })))?;
-        tts.on_utterance_stop(Some(Box::new(|utterance| {
-            println!("Stopped speaking {:?}", utterance)
-        })))?;
-    }
-    let Features { is_speaking, .. } = tts.supported_features();
-    if is_speaking {
-        println!("Are we speaking? {}", tts.is_speaking()?);
-    }
-    tts.speak("Hello, world.", false)?;
-
     println!("Creating UI");
     nwg::init().expect("Failed to init Native Windows GUI");
 
-    let _built_gui = App::build_ui(App::default()).expect("Failed to build UI");
+    let _built_gui = App::build_ui(App::default()).unwrap();
 
     nwg::dispatch_thread_events();
 
@@ -180,7 +37,7 @@ fn read(data: &String, tts: &mut Tts) {
 }
 
 fn get_strings(engine: &OcrEngine) -> Result<Vec<StrToRead>, Box<dyn StdError>> {
-    let screen = Screen::all().unwrap()[0];
+    /*let screen = Screen::all().unwrap()[0];
 
     //println!("Screen: {screen:?}");
     let rgb_image = screen.capture().unwrap();
@@ -205,7 +62,8 @@ fn get_strings(engine: &OcrEngine) -> Result<Vec<StrToRead>, Box<dyn StdError>> 
                 .map_or("".to_string(), |x| x.to_string()),
         })
         .filter(|str_to_read| str_to_read.str.len() > 5)
-        .collect())
+        .collect())*/
+    Ok(vec![])
 }
 
 fn get_closest_rect(rects: &mut Vec<StrToRead>, position: Mouse) -> StrToRead {
@@ -324,12 +182,4 @@ fn update_and_get_new_position(
 
     println!("Creating window at {:?}", read_position);
     (read_position.0, read_position.1)
-}
-
-trait NativeGui {
-    fn init() -> Box<dyn NativeGui>
-    where
-        Self: Sized;
-
-    fn set_position(&self, x: f32, y: f32);
 }
