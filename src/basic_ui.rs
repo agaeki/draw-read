@@ -78,17 +78,8 @@ impl nwg::NativeUi<BasicAppUi> for App {
                     E::OnWindowClose => {
                         nwg::stop_thread_dispatch();
                     }
-                    E::OnTimerTick => {
-                        //println!("Timer ticked for {:?} {:?}", handle, ui.window.handle);
-                        /*let new_position = update_and_get_new_position(
-                            &mut ui.engine.borrow_mut(),
-                            &mut ui.tts.borrow_mut(),
-                            &mut ui.read_position.borrow_mut(),
-                            &mut ui.to_read.borrow_mut(),
-                        );
-
-                        ui.window
-                            .set_position(new_position.0 as i32, new_position.1 as i32);*/
+                    E::OnInit => {
+                        app.borrow_mut().init();
                     }
                     _ => {}
                 }
@@ -104,7 +95,8 @@ impl nwg::NativeUi<BasicAppUi> for App {
                             app.borrow().screenshot_frame.handle,
                             None,
                         );
-                        app.borrow_mut().start_draw_rect(mouse_pos);
+                        app.borrow_mut()
+                            .start_draw_rect((mouse_pos.0 as u32, mouse_pos.1 as u32));
                     }
                     E::OnMousePress(MousePressEvent::MousePressLeftUp) => {
                         println!("OnMousePress MousePressLeftUp");
