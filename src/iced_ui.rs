@@ -34,18 +34,16 @@ pub struct IcedApp {
 impl Sandbox for IcedApp {
     fn view(&self) -> Element<'_, Message> {
         if let Some(screenshot_image) = &self.screenshot_image {
-            column![iced::widget::image(Handle::from_pixels(
+            iced::widget::image(Handle::from_pixels(
                 self.screenshot_size.0,
                 self.screenshot_size.1,
                 screenshot_image.clone(),
             ))
-            .content_fit(ContentFit::Contain)
-            .width(Length::Fill)
-            .height(Length::Fill)]
+            .content_fit(ContentFit::None)
             .into()
         } else {
-            let _ = iced::window::resize::<()>(Id::MAIN, Size::new(60., 32.));
-            column![button("READ").on_press(Message::Read)].into()
+            //let _ = iced::window::resize::<()>(Id::MAIN, Size::new(60., 32.));
+            button("READ").on_press(Message::Read).into()
         }
     }
 
@@ -57,21 +55,17 @@ impl Sandbox for IcedApp {
 
                 let rgb_image = monitor.capture_image().unwrap();
 
-                // Store original screenshot so that we can draw a resizing rectangle on a clone without losing pixels
-                self.screenshot_buffer = Vec::<u8>::with_capacity(rgb_image.len());
-                let mut encoder = BmpEncoder::new(&mut self.screenshot_buffer);
-                let _ = encoder.encode(
-                    &rgb_image.clone().into_raw()[..],
-                    rgb_image.width(),
-                    rgb_image.height(),
-                    ExtendedColorType::Rgba8,
-                );
-
-                self.screenshot_image = Some(self.screenshot_buffer.clone());
                 let _ = iced::window::resize::<()>(
                     Id::MAIN,
                     Size::new(rgb_image.width() as f32, rgb_image.height() as f32),
                 );
+
+                self.screenshot_size = (rgb_image.width(), rgb_image.height());
+
+                // Store original screenshot so that we can draw a resizing rectangle on a clone without losing pixels
+                self.screenshot_buffer = rgb_image.into_raw();
+
+                self.screenshot_image = Some(self.screenshot_buffer.clone());
             }
             _ => panic!("{:?} Not implemented", message),
         }

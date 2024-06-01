@@ -1,3 +1,4 @@
+use iced::window::Id;
 use iced::Error;
 use iced::Sandbox;
 use iced::Size;
@@ -15,8 +16,8 @@ fn main() -> Result<(), Error> {
     println!("Creating UI");
 
     let mut settings: iced::Settings<()> = Settings::default();
-    settings.id = Some("MainWin".to_string());
-    //settings.window.resizable = false;
+    settings.window.size = Size::new(65., 32.);
+    settings.window.resizable = false;
     settings.window.decorations = false;
     IcedApp::run(settings)?;
 
