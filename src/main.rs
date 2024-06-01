@@ -1,21 +1,24 @@
+use iced::Error;
+use iced::Sandbox;
+use iced::Size;
 extern crate native_windows_derive as nwd;
 extern crate native_windows_gui as nwg;
 
-use crate::app_logic::App;
-use crate::nwg::NativeUi;
-use tts::*;
-
+use crate::iced_ui::IcedApp;
+use iced::Settings;
 mod app_logic;
 mod basic_ui;
+mod iced_ui;
 mod timer;
 
 fn main() -> Result<(), Error> {
     println!("Creating UI");
-    nwg::init().expect("Failed to init Native Windows GUI");
 
-    let _built_gui = App::build_ui(App::default()).unwrap();
-
-    nwg::dispatch_thread_events();
+    let mut settings: iced::Settings<()> = Settings::default();
+    settings.id = Some("MainWin".to_string());
+    //settings.window.resizable = false;
+    settings.window.decorations = false;
+    IcedApp::run(settings)?;
 
     Ok(())
 }

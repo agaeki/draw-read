@@ -15,17 +15,12 @@ use ocrs::OcrEngine;
 
 use tts::Tts;
 
-use rten_imageproc::RotatedRect;
-
 static RECT_COLOUR: [u8; 4] = [0, 255, 0, 255];
 
 #[derive(Default)]
 pub struct App {
-    pub to_read: RefCell<String>,
-    pub read_position: RefCell<(f32, f32)>,
     pub engine: RefCell<Option<OcrEngine>>,
     pub tts: RefCell<Option<Tts>>,
-    pub screenshot: Option<image::RgbaImage>,
     pub screenshot_buffer: Vec<u8>,
 
     pub window: nwg::Window,
@@ -36,12 +31,6 @@ pub struct App {
     pub screenshot_frame: nwg::ImageFrame,
     pub screenshot_image: nwg::Bitmap,
     pub rect_start: Option<(u32, u32)>,
-}
-
-#[derive(Clone, Debug)]
-pub struct StrToRead {
-    pub position: RotatedRect,
-    pub str: String,
 }
 
 impl App {
