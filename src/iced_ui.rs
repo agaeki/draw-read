@@ -1,13 +1,15 @@
+use iced::executor;
+use iced::widget::button;
 use iced::widget::image::Handle;
-use iced::widget::{button, column};
 use iced::window::Id;
+use iced::Application;
+use iced::Command;
 use iced::ContentFit;
 use iced::Element;
-use iced::Length;
+use iced::Point;
 use iced::Sandbox;
 use iced::Size;
-use image::codecs::bmp::BmpEncoder;
-use image::ExtendedColorType;
+use iced::Theme;
 use ocrs::OcrEngine;
 use std::cell::RefCell;
 use tts::Tts;
@@ -31,7 +33,12 @@ pub struct IcedApp {
     pub screenshot_image: Option<Vec<u8>>,
 }
 
-impl Sandbox for IcedApp {
+impl Application for IcedApp {
+    type Executor = executor::Default;
+    type Message = Message;
+    type Theme = Theme;
+    type Flags = ();
+
     fn view(&self) -> Element<'_, Message> {
         if let Some(screenshot_image) = &self.screenshot_image {
             iced::widget::image(Handle::from_pixels(
@@ -47,18 +54,22 @@ impl Sandbox for IcedApp {
         }
     }
 
-    fn update(&mut self, message: Message) {
+    fn update(&mut self, message: Message) -> iced::Command<Message> {
         match message {
             Message::Read => {
                 println!("Read clicked");
                 let monitor = &Monitor::all().unwrap()[0];
-
+                println!("Size is {:?} {:?}", monitor.width(), monitor.height());
                 let rgb_image = monitor.capture_image().unwrap();
 
-                let _ = iced::window::resize::<()>(
-                    Id::MAIN,
-                    Size::new(rgb_image.width() as f32, rgb_image.height() as f32),
-                );
+                println!("Size is {:?} {:?}", rgb_image.width(), rgb_image.height());
+                let ret = Command::batch([
+                    iced::window::resize(
+                        Id::MAIN,
+                        Size::new(rgb_image.width() as f32, rgb_image.height() as f32),
+                    ),
+                    iced::window::move_to(Id::MAIN, Point::new(0., 0.)),
+                ]);
 
                 self.screenshot_size = (rgb_image.width(), rgb_image.height());
 
@@ -66,13 +77,17 @@ impl Sandbox for IcedApp {
                 self.screenshot_buffer = rgb_image.into_raw();
 
                 self.screenshot_image = Some(self.screenshot_buffer.clone());
+
+                ret
             }
             _ => panic!("{:?} Not implemented", message),
         }
     }
-    type Message = Message;
-    fn new() -> Self {
-        Self::default()
+    fn new(flags: Self::Flags) -> (Self, iced::Command<Message>) {
+        (
+            Self::default(),
+            iced::window::resize(Id::MAIN, Size::new(65., 32.)),
+        )
     }
     fn title(&self) -> std::string::String {
         "".to_string()

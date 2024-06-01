@@ -1,4 +1,5 @@
 use iced::window::Id;
+use iced::Application;
 use iced::Error;
 use iced::Sandbox;
 use iced::Size;
@@ -19,6 +20,7 @@ fn main() -> Result<(), Error> {
     settings.window.size = Size::new(65., 32.);
     settings.window.resizable = false;
     settings.window.decorations = false;
+
     IcedApp::run(settings)?;
 
     Ok(())
