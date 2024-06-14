@@ -1,7 +1,5 @@
-use iced::window::Id;
-use iced::Application;
+use iced::advanced::Application;
 use iced::Error;
-use iced::Sandbox;
 use iced::Size;
 extern crate native_windows_derive as nwd;
 extern crate native_windows_gui as nwg;

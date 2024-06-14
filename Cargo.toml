@@ -13,7 +13,7 @@ rten = "*"
 rten-imageproc = "*"
 mouse_position = "*"
 tts = "*"
-iced = { version="*", features = ["advanced", "image"] }
+iced = { path = "../iced", features = ["advanced", "image"] }
 
 [target.'cfg(windows)'.dependencies]
 native-windows-gui = { path = "../native-windows-gui/native-windows-gui", features = ["image-decoder"]}
