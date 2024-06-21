@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 use iced::advanced::Application;
 use iced::Error;
 use iced::Size;
