@@ -9,6 +9,7 @@ use crate::iced_ui::IcedApp;
 use iced::Settings;
 mod app_logic;
 mod basic_ui;
+mod iced_logic;
 mod iced_ui;
 mod timer;
 
