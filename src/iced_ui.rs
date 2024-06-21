@@ -4,6 +4,7 @@ use iced::executor;
 use iced::widget::button;
 use iced::widget::clickable;
 use iced::widget::image::Handle;
+use iced::widget::text;
 use iced::window::Id;
 use iced::Command;
 use iced::ContentFit;
@@ -32,6 +33,7 @@ static RECT_COLOUR: [u8; 4] = [0, 255, 0, 255];
 #[derive(Clone, Copy, Debug)]
 pub enum Message {
     Read,
+    Stop,
     StartRect,
     EndRect,
     MouseMoved(UPoint),
@@ -74,9 +76,13 @@ impl Application for IcedApp {
             .on_mouse_down(Message::StartRect)
             .on_mouse_up(Message::EndRect)
             .into()
-        } else {
-            //let _ = iced::window::resize::<()>(Id::MAIN, Size::new(60., 32.));
+        } else if let Ok(false) = self.tts.is_speaking() {
             button("READ").on_press(Message::Read).into()
+        } else if let Ok(true) = self.tts.is_speaking() {
+            button("STOP").on_press(Message::Stop).into()
+        } else {
+            eprintln!("ERROR: {:?}", self.tts.is_speaking());
+            text("ERROR").into()
         }
     }
 
@@ -119,7 +125,16 @@ impl Application for IcedApp {
                 Command::none()
             }
             Message::EndRect => {
-                self.speak_from_rect();
+                if let Some(rect_start) = self.rect_start
+                    && let Some(rect_end) = self.rect_end
+                {
+                    self.speak_from_rect(
+                        self.screenshot_buffer.clone(),
+                        self.screenshot_size,
+                        rect_start,
+                        rect_end,
+                    );
+                }
                 self.rect_start = None;
                 self.screenshot_image = None;
                 iced::window::resize(Id::MAIN, Size::new(65., 32.))
@@ -137,6 +152,12 @@ impl Application for IcedApp {
                         get_top_left(rect_start, rect_end),
                         get_bottom_right(rect_start, rect_end),
                     );
+                }
+                Command::none()
+            }
+            Message::Stop => {
+                if let Err(e) = self.tts.stop() {
+                    eprintln!("Error stopping speaking: {:?}", e);
                 }
                 Command::none()
             }
@@ -244,7 +265,7 @@ impl IcedApp {
 
     fn init_tts() -> Tts {
         println!("Initialising reader");
-        let mut inner_tts = Tts::default().expect("Failed to start Text-to-Speech");
+        let inner_tts = Tts::default().expect("Failed to start Text-to-Speech");
         if Tts::screen_reader_available() {
             println!("A screen reader is available on this platform.");
         } else {
@@ -271,61 +292,54 @@ impl IcedApp {
                 })))
                 .unwrap();
         }
-        let Features { is_speaking, .. } = inner_tts.supported_features();
-        if is_speaking {
-            println!("Are we speaking? {}", inner_tts.is_speaking().unwrap());
-        }
-        inner_tts.speak("Hello, world.", false).unwrap();
 
         inner_tts
     }
 
-    fn speak_from_rect(&mut self) {
-        let (width, height) = self.screenshot_size;
+    fn speak_from_rect(
+        &mut self,
+        screenshot: Vec<u8>,
+        screenshot_size: (u32, u32),
+        first_corner: UPoint,
+        second_corner: UPoint,
+    ) {
+        let (width, height) = screenshot_size;
 
-        if let Some(first_corner) = self.rect_start
-            && let Some(second_corner) = self.rect_end
-        {
-            let rect_start = get_top_left(first_corner, second_corner);
-            let rect_end = get_bottom_right(first_corner, second_corner);
+        let rect_start = get_top_left(first_corner, second_corner);
+        let rect_end = get_bottom_right(first_corner, second_corner);
 
-            let (new_width, new_height) = (
-                rect_end.x as u32 - rect_start.x,
-                rect_end.y as u32 - rect_start.y,
-            );
-            let raw_img =
-                ImageBuffer::from_raw(width, height, self.screenshot_buffer.clone()).unwrap();
-            let cropped_buf: SubImage<&ImageBuffer<image::Rgba<u8>, Vec<u8>>> =
-                imageops::crop_imm(&raw_img, rect_start.x, rect_start.y, new_width, new_height);
+        let (new_width, new_height) = (
+            rect_end.x as u32 - rect_start.x,
+            rect_end.y as u32 - rect_start.y,
+        );
+        let raw_img = ImageBuffer::from_raw(width, height, screenshot.clone()).unwrap();
+        let cropped_buf: SubImage<&ImageBuffer<image::Rgba<u8>, Vec<u8>>> =
+            imageops::crop_imm(&raw_img, rect_start.x, rect_start.y, new_width, new_height);
 
-            cropped_buf.to_image().save("cropped_buf.png").unwrap();
+        cropped_buf.to_image().save("cropped_buf.png").unwrap();
 
-            let binding = cropped_buf.to_image().into_raw();
-            let img_source =
-                ImageSource::from_bytes(&binding[..], (new_width, new_height)).unwrap();
+        let binding = cropped_buf.to_image().into_raw();
+        let img_source = ImageSource::from_bytes(&binding[..], (new_width, new_height)).unwrap();
 
-            let ocr_input = self.engine.prepare_input(img_source).unwrap();
+        let ocr_input = self.engine.prepare_input(img_source).unwrap();
 
-            // Get oriented bounding boxes of text words in input image.
-            let word_rects = self.engine.detect_words(&ocr_input).unwrap();
+        // Get oriented bounding boxes of text words in input image.
+        let word_rects = self.engine.detect_words(&ocr_input).unwrap();
 
-            // Group words into lines. Each line is represented by a list of word
-            // bounding boxes.
-            let line_rects = self.engine.find_text_lines(&ocr_input, &word_rects);
+        // Group words into lines. Each line is represented by a list of word
+        // bounding boxes.
+        let line_rects = self.engine.find_text_lines(&ocr_input, &word_rects);
 
-            let words = self
-                .engine
-                .recognize_text(&ocr_input, &line_rects[..])
-                .unwrap()
-                .into_iter()
-                .map(|x| x.map_or("".to_string(), |x| x.to_string()))
-                .collect::<Vec<_>>()
-                .join(" ");
+        let words = self
+            .engine
+            .recognize_text(&ocr_input, &line_rects[..])
+            .unwrap()
+            .into_iter()
+            .map(|x| x.map_or("".to_string(), |x| x.to_string()))
+            .collect::<Vec<_>>()
+            .join(" ");
 
-            println!("Speaking {words}");
-            self.tts.speak(words, false).unwrap();
-
-            self.rect_start = None;
-        }
+        println!("Speaking {words}");
+        self.tts.speak(words, false).unwrap();
     }
 }
