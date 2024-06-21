@@ -15,11 +15,13 @@ use iced::Subscription;
 use iced::Theme;
 use image::imageops;
 use image::ImageBuffer;
+use image::SubImage;
 use mouse_position::mouse_position::Mouse;
 use ocrs::ImageSource;
 use ocrs::OcrEngine;
 use ocrs::OcrEngineParams;
 use rten::Model;
+use std::cmp;
 use std::fs;
 use tts::Features;
 use tts::Tts;
@@ -82,25 +84,29 @@ impl Application for IcedApp {
         match message {
             Message::Read => {
                 println!("Read clicked");
-                let monitor = &Monitor::all().unwrap()[0];
-                let rgb_image = monitor.capture_image().unwrap();
+                if let Mouse::Position { x, y } = Mouse::get_mouse_position() {
+                    let monitor = &Monitor::from_point(x, y).unwrap();
+                    let rgb_image = monitor.capture_image().unwrap();
 
-                let ret = Command::batch([
-                    iced::window::resize(
-                        Id::MAIN,
-                        Size::new(rgb_image.width() as f32, rgb_image.height() as f32),
-                    ),
-                    iced::window::move_to(Id::MAIN, Point::new(0., 0.)),
-                ]);
+                    let ret = Command::batch([
+                        iced::window::resize(
+                            Id::MAIN,
+                            Size::new(rgb_image.width() as f32, rgb_image.height() as f32),
+                        ),
+                        iced::window::move_to(Id::MAIN, Point::new(0., 0.)),
+                    ]);
 
-                self.screenshot_size = (rgb_image.width(), rgb_image.height());
+                    self.screenshot_size = (rgb_image.width(), rgb_image.height());
 
-                // Store original screenshot so that we can draw a resizing rectangle on a clone without losing pixels
-                self.screenshot_buffer = rgb_image.into_raw();
+                    // Store original screenshot so that we can draw a resizing rectangle on a clone without losing pixels
+                    self.screenshot_buffer = rgb_image.into_raw();
 
-                self.screenshot_image = Some(self.screenshot_buffer.clone());
+                    self.screenshot_image = Some(self.screenshot_buffer.clone());
 
-                ret
+                    ret
+                } else {
+                    Command::none()
+                }
             }
             Message::StartRect => {
                 if let Mouse::Position { x, y } = Mouse::get_mouse_position() {
@@ -119,18 +125,18 @@ impl Application for IcedApp {
                 iced::window::resize(Id::MAIN, Size::new(65., 32.))
             }
             Message::MouseMoved(pos) => {
-                if let Some(rect_start) = self.rect_start {
-                    if let Some(screenshot_image) = &mut self.screenshot_image {
-                        screenshot_image.copy_from_slice(&self.screenshot_buffer[..]);
-                        draw_rectangle(
-                            &mut self.screenshot_image.as_mut().unwrap(),
-                            self.screenshot_size,
-                            rect_start,
-                            pos,
-                        );
-
-                        self.rect_end = Some(pos);
-                    }
+                self.rect_end = Some(pos);
+                if let Some(rect_start) = self.rect_start
+                    && let Some(rect_end) = self.rect_end
+                    && let Some(screenshot_image) = &mut self.screenshot_image
+                {
+                    screenshot_image.copy_from_slice(&self.screenshot_buffer[..]);
+                    draw_rectangle(
+                        &mut self.screenshot_image.as_mut().unwrap(),
+                        self.screenshot_size,
+                        get_top_left(rect_start, rect_end),
+                        get_bottom_right(rect_start, rect_end),
+                    );
                 }
                 Command::none()
             }
@@ -183,6 +189,20 @@ fn draw_rectangle(buffer: &mut [u8], size: (u32, u32), start: UPoint, end: UPoin
 
         buffer[top_index..top_index + 4].clone_from_slice(&RECT_COLOUR);
         buffer[bottom_index..bottom_index + 4].clone_from_slice(&RECT_COLOUR);
+    }
+}
+
+fn get_top_left(point1: UPoint, point2: UPoint) -> UPoint {
+    UPoint {
+        x: cmp::min(point1.x, point2.x),
+        y: cmp::min(point1.y, point2.y),
+    }
+}
+
+fn get_bottom_right(point1: UPoint, point2: UPoint) -> UPoint {
+    UPoint {
+        x: cmp::max(point1.x, point2.x),
+        y: cmp::max(point1.y, point2.y),
     }
 }
 
@@ -262,24 +282,21 @@ impl IcedApp {
 
     fn speak_from_rect(&mut self) {
         let (width, height) = self.screenshot_size;
-        let img_buf: ImageBuffer<image::Rgba<u8>, Vec<u8>> = imageops::flip_vertical(
-            &ImageBuffer::from_raw(width, height, self.screenshot_buffer.clone()).unwrap(),
-        );
 
-        if let Some(rect_start) = self.rect_start
-            && let Some(rect_end) = self.rect_end
+        if let Some(first_corner) = self.rect_start
+            && let Some(second_corner) = self.rect_end
         {
-            println!("{:?} -> {:?}", rect_start, rect_end);
-            if rect_start.x >= rect_end.x as u32 || rect_start.y >= rect_end.y as u32 {
-                println!("Invalid bounds received, reading nothing");
-                return;
-            }
+            let rect_start = get_top_left(first_corner, second_corner);
+            let rect_end = get_bottom_right(first_corner, second_corner);
+
             let (new_width, new_height) = (
                 rect_end.x as u32 - rect_start.x,
                 rect_end.y as u32 - rect_start.y,
             );
-            let cropped_buf =
-                imageops::crop_imm(&img_buf, rect_start.x, rect_start.y, new_width, new_height);
+            let raw_img =
+                ImageBuffer::from_raw(width, height, self.screenshot_buffer.clone()).unwrap();
+            let cropped_buf: SubImage<&ImageBuffer<image::Rgba<u8>, Vec<u8>>> =
+                imageops::crop_imm(&raw_img, rect_start.x, rect_start.y, new_width, new_height);
 
             cropped_buf.to_image().save("cropped_buf.png").unwrap();
 
