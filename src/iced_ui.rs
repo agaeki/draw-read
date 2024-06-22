@@ -133,7 +133,10 @@ impl Application for IcedApp {
                 }
                 self.rect_start = None;
                 self.screenshot_image = None;
-                iced::window::resize(Id::MAIN, Size::new(65., 32.))
+                Command::batch([
+                    iced::window::resize(Id::MAIN, Size::new(65., 32.)),
+                    iced::window::move_to(Id::MAIN, self.settings.position.into()),
+                ])
             }
             Message::MouseMoved(pos) => {
                 self.rect_end = Some(pos);
@@ -147,6 +150,7 @@ impl Application for IcedApp {
                         self.screenshot_size,
                         get_top_left(rect_start, rect_end),
                         get_bottom_right(rect_start, rect_end),
+                        &self.settings.rect_colour,
                     );
                 }
                 Command::none()
@@ -162,7 +166,10 @@ impl Application for IcedApp {
     fn new(_flags: Self::Flags) -> (Self, iced::Command<Message>) {
         (
             Self::default(),
-            iced::window::resize(Id::MAIN, Size::new(65., 32.)),
+            Command::batch([
+                iced::window::resize(Id::MAIN, Size::new(65., 32.)),
+                iced::window::move_to(Id::MAIN, Self::default().settings.position.into()),
+            ]),
         )
     }
     fn title(&self) -> std::string::String {
@@ -188,9 +195,10 @@ impl Application for IcedApp {
 
 impl Default for IcedApp {
     fn default() -> Self {
+        let settings = Settings::default();
         Self {
-            engine: iced_logic::init_engine(),
-            tts: iced_logic::init_tts(),
+            engine: iced_logic::init_engine(&settings),
+            tts: iced_logic::init_tts(&settings),
             screenshot_buffer: vec![],
             screenshot_size: (0, 0),
             rect_start: None,
@@ -198,7 +206,7 @@ impl Default for IcedApp {
 
             screenshot_image: None,
 
-            settings: Settings::default(),
+            settings: settings,
         }
     }
 }
