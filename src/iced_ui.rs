@@ -5,14 +5,14 @@ use crate::iced_logic::get_top_left;
 use crate::iced_logic::UPoint;
 use crate::options;
 use crate::options::Settings;
-use iced::advanced::Application;
 use iced::event;
 use iced::executor;
 use iced::widget::button;
-use iced::widget::clickable;
 use iced::widget::image::Handle;
+use iced::widget::mouse_area;
 use iced::widget::text;
 use iced::window::Id;
+use iced::Application;
 use iced::Command;
 use iced::ContentFit;
 use iced::Element;
@@ -50,7 +50,7 @@ pub struct IcedApp {
 }
 
 impl Application for IcedApp {
-    type Renderer = Renderer;
+    //type Renderer = Renderer;
     type Executor = executor::Default;
     type Message = Message;
     type Theme = Theme;
@@ -58,16 +58,16 @@ impl Application for IcedApp {
 
     fn view(&self) -> Element<'_, Message> {
         if let Some(screenshot_image) = &self.screenshot_image {
-            clickable(
-                iced::widget::image(Handle::from_rgba(
+            mouse_area(
+                iced::widget::image(Handle::from_pixels(
                     self.screenshot_size.0,
                     self.screenshot_size.1,
                     screenshot_image.clone(),
                 ))
                 .content_fit(ContentFit::None),
             )
-            .on_mouse_down(Message::StartRect)
-            .on_mouse_up(Message::EndRect)
+            .on_press(Message::StartRect)
+            .on_release(Message::EndRect)
             .into()
         } else if let Ok(false) = self.tts.is_speaking() {
             button("READ").on_press(Message::Read).into()
@@ -167,7 +167,7 @@ impl Application for IcedApp {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        event::listen_with(|evt, _, _| {
+        event::listen_with(|evt, _| {
             if let iced::Event::Mouse(iced::mouse::Event::CursorMoved {
                 position: Point { x, y },
             }) = evt
