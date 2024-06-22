@@ -1,3 +1,6 @@
+// This file is part of draw-read
+// Copyright (C) 2024 agaeki
+
 use crate::iced_logic::UPoint;
 use serde::*;
 use std::path::PathBuf;

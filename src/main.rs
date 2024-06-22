@@ -1,3 +1,6 @@
+// This file is part of draw-read
+// Copyright (C) 2024 agaeki
+
 #![feature(let_chains)]
 use iced::Application;
 use iced::Error;

@@ -1,3 +1,6 @@
+// This file is part of draw-read
+// Copyright (C) 2024 agaeki
+
 use image::imageops;
 use image::ImageBuffer;
 use image::SubImage;
