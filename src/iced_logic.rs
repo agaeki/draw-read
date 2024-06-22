@@ -4,12 +4,13 @@ use image::SubImage;
 use ocrs::OcrEngine;
 use ocrs::OcrEngineParams;
 use rten::Model;
+use serde::*;
 use std::cmp;
 use std::fs;
 use tts::Features;
 use tts::Tts;
 
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug, Copy, Default, Serialize, Deserialize)]
 pub struct UPoint {
     pub x: u32,
     pub y: u32,
@@ -22,8 +23,8 @@ pub fn init_engine() -> OcrEngine {
     let detection_model_data = fs::read("text-detection.rten").unwrap();
     let rec_model_data = fs::read("text-recognition.rten").unwrap();
 
-    let detection_model = Model::load(&detection_model_data).unwrap();
-    let recognition_model = Model::load(&rec_model_data).unwrap();
+    let detection_model = Model::load(detection_model_data).unwrap();
+    let recognition_model = Model::load(rec_model_data).unwrap();
 
     println!("Initialising OCR engine");
 

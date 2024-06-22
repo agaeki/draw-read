@@ -3,6 +3,8 @@ use crate::iced_logic::draw_rectangle;
 use crate::iced_logic::get_bottom_right;
 use crate::iced_logic::get_top_left;
 use crate::iced_logic::UPoint;
+use crate::options;
+use crate::options::Settings;
 use iced::advanced::Application;
 use iced::event;
 use iced::executor;
@@ -43,6 +45,8 @@ pub struct IcedApp {
     pub rect_end: Option<UPoint>,
 
     pub screenshot_image: Option<Vec<u8>>,
+
+    pub settings: options::Settings,
 }
 
 impl Application for IcedApp {
@@ -190,6 +194,8 @@ impl Default for IcedApp {
             rect_end: None,
 
             screenshot_image: None,
+
+            settings: Settings::default(),
         }
     }
 }
@@ -202,7 +208,7 @@ impl IcedApp {
         first_corner: UPoint,
         second_corner: UPoint,
     ) {
-        let (img_source_bytes, new_height, new_width) = iced_logic::get_cropped_image_source(
+        let (img_source_bytes, new_width, new_height) = iced_logic::get_cropped_image_source(
             screenshot,
             screenshot_size,
             first_corner,

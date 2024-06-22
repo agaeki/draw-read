@@ -1,25 +1,21 @@
 [package]
-name = "screen_reader_1"
+name = "draw-read"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ocrs = { git = "https://github.com/robertknight/ocrs.git" }
-image = {version = "*", features=["bmp"]}
-xcap = "*"
+ocrs = "0.8.0"
+image = {version = "0.25.1", features=["bmp"]}
+xcap = "0.0.10"
 rten = "*"
 rten-imageproc = "*"
-mouse_position = "*"
-tts = "*"
+mouse_position = "0.1.4"
+tts = "0.26.1"
 iced = { path = "../iced", features = ["advanced", "image"] }
-
-[target.'cfg(windows)'.dependencies]
-native-windows-gui = { path = "../native-windows-gui/native-windows-gui", features = ["image-decoder"]}
-native-windows-derive = { path = "../native-windows-gui/native-windows-derive" }
-windows = { version = "*", features = [ "Win32_UI", "Win32_UI_WindowsAndMessaging" ] }
-winapi = "*"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.117"
 
 [build-dependencies]
 embed-manifest = "*"
