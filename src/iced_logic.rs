@@ -81,14 +81,14 @@ pub fn init_tts(settings: &options::Settings) -> Tts {
             .unwrap();
     }
 
-    let pitch_coefficient = (inner_tts.max_pitch() - inner_tts.min_pitch()) / 5.;
+    let pitch_coefficient = (inner_tts.max_pitch() - inner_tts.min_pitch()) / 6.;
     let pitch_multiplier = match &settings.pitch {
-        VoicePitch::Soprano => 1.,
-        VoicePitch::Mezzo => 2.,
-        VoicePitch::Alto => 3.,
-        VoicePitch::Tenor => 4.,
-        VoicePitch::Baritone => 5.,
-        VoicePitch::Bass => 6.,
+        VoicePitch::Soprano => 6.,
+        VoicePitch::Mezzo => 5.,
+        VoicePitch::Alto => 4.,
+        VoicePitch::Tenor => 3.,
+        VoicePitch::Baritone => 2.,
+        VoicePitch::Bass => 1.,
     };
     println!(
         "Setting pitch to {:?}",
