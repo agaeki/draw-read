@@ -104,7 +104,7 @@ pub fn init_tts(settings: &options::Settings) -> Tts {
         .set_pitch(inner_tts.min_pitch() + pitch_multiplier * pitch_coefficient)
         .unwrap();
 
-    let rate_coefficient = (inner_tts.max_rate() - inner_tts.min_rate()) / 5.;
+    let rate_coefficient = (inner_tts.max_rate() - inner_tts.min_rate()) / 6.;
     let rate_multiplier = match &settings.rate {
         // Windows rate goes non-linearly from 0.5 to 6.0 with 1 as the default. Delineations are approximate.
         VoiceRate::Slowest => 0.4545,
@@ -112,6 +112,7 @@ pub fn init_tts(settings: &options::Settings) -> Tts {
         VoiceRate::Default => 0.909,
         VoiceRate::Fast => 3.18,
         VoiceRate::Fastest => 5.45,
+        VoiceRate::TooFast => 5.45,
     };
     println!("Setting rate to {:?}", rate_multiplier * rate_coefficient);
     println!(

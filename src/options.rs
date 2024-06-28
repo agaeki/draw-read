@@ -3,12 +3,13 @@
 
 use crate::iced_logic::UPoint;
 use directories::ProjectDirs;
+use num_traits::cast::FromPrimitive;
 use serde::*;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub enum VoicePitch {
     Soprano,
     Mezzo,
@@ -19,7 +20,7 @@ pub enum VoicePitch {
     Bass,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Copy, PartialOrd, PartialEq)]
 pub enum VoiceRate {
     Slowest,
     Slow,
@@ -27,6 +28,56 @@ pub enum VoiceRate {
     Default,
     Fast,
     Fastest,
+    TooFast,
+}
+
+impl From<u8> for VoiceRate {
+    fn from(num: u8) -> Self {
+        match num {
+            1 => VoiceRate::Slowest,
+            2 => VoiceRate::Slow,
+            3 => VoiceRate::Default,
+            4 => VoiceRate::Fast,
+            5 => VoiceRate::Fastest,
+            _ => VoiceRate::TooFast,
+        }
+    }
+}
+
+impl Into<f64> for VoiceRate {
+    fn into(self) -> f64 {
+        match self {
+            VoiceRate::Slowest => 1.,
+            VoiceRate::Slow => 2.,
+            VoiceRate::Default => 3.,
+            VoiceRate::Fast => 4.,
+            VoiceRate::Fastest => 5.,
+            VoiceRate::TooFast => 6.,
+        }
+    }
+}
+
+impl FromPrimitive for VoiceRate {
+    fn from_i64(num: i64) -> std::option::Option<Self> {
+        match num {
+            1 => Some(VoiceRate::Slowest),
+            2 => Some(VoiceRate::Slow),
+            3 => Some(VoiceRate::Default),
+            4 => Some(VoiceRate::Fast),
+            5 => Some(VoiceRate::Fastest),
+            _ => Some(VoiceRate::TooFast),
+        }
+    }
+    fn from_u64(num: u64) -> std::option::Option<Self> {
+        match num {
+            1 => Some(VoiceRate::Slowest),
+            2 => Some(VoiceRate::Slow),
+            3 => Some(VoiceRate::Default),
+            4 => Some(VoiceRate::Fast),
+            5 => Some(VoiceRate::Fastest),
+            _ => Some(VoiceRate::TooFast),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

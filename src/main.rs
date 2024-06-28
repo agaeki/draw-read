@@ -8,6 +8,7 @@ use iced::Size;
 
 use crate::iced_ui::IcedApp;
 use iced::Settings;
+
 mod iced_logic;
 mod iced_ui;
 mod options;

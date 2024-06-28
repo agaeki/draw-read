@@ -8,11 +8,16 @@ use crate::iced_logic::get_top_left;
 use crate::iced_logic::UPoint;
 use crate::options;
 use crate::options::Settings;
+use crate::options::VoiceRate;
 use iced::event;
 use iced::executor;
+use iced::widget;
 use iced::widget::button;
+use iced::widget::column;
+use iced::widget::horizontal_rule;
 use iced::widget::image::Handle;
 use iced::widget::mouse_area;
+use iced::widget::row;
 use iced::widget::text;
 use iced::window::Id;
 use iced::Application;
@@ -27,16 +32,29 @@ use iced::Theme;
 use mouse_position::mouse_position::Mouse;
 use ocrs::ImageSource;
 use ocrs::OcrEngine;
+use std::fmt::Debug;
+use std::sync::Arc;
 use tts::Tts;
 use xcap::Monitor;
 
-#[derive(Clone, Copy, Debug)]
+pub const WINDOW_SIZE: Size = Size::new(100., 32.);
+pub const WINDOW_SIZE_SETTINGS: Size = Size::new(200., 400.);
+
+#[derive(Clone)]
 pub enum Message {
     Read,
     Stop,
     StartRect,
     EndRect,
     MouseMoved(UPoint),
+    Settings,
+    SettingChanged(Arc<dyn Fn(&mut Settings) + Send + Sync>),
+}
+
+impl Debug for Message {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        f.debug_struct("Message").finish()
+    }
 }
 
 pub struct IcedApp {
@@ -48,6 +66,7 @@ pub struct IcedApp {
     pub rect_end: Option<UPoint>,
 
     pub screenshot_image: Option<Vec<u8>>,
+    pub settings_open: bool,
 
     pub settings: options::Settings,
 }
@@ -73,9 +92,33 @@ impl Application for IcedApp {
             .on_release(Message::EndRect)
             .into()
         } else if let Ok(false) = self.tts.is_speaking() {
-            button("READ").on_press(Message::Read).into()
+            column([
+                row([
+                    button(widget::image(Handle::from_memory(include_bytes!(
+                        "gear_image.png"
+                    ))))
+                    .on_press(Message::Settings)
+                    .into(),
+                    button("READ").on_press(Message::Read).into(),
+                ])
+                .into(),
+                settings_widget(&self),
+            ])
+            .into()
         } else if let Ok(true) = self.tts.is_speaking() {
-            button("STOP").on_press(Message::Stop).into()
+            column([
+                row([
+                    button(widget::image(Handle::from_memory(include_bytes!(
+                        "gear_image.png"
+                    ))))
+                    .on_press(Message::Settings)
+                    .into(),
+                    button("STOP").on_press(Message::Stop).into(),
+                ])
+                .into(),
+                settings_widget(&self),
+            ])
+            .into()
         } else {
             eprintln!("ERROR: {:?}", self.tts.is_speaking());
             text("ERROR").into()
@@ -134,7 +177,7 @@ impl Application for IcedApp {
                 self.rect_start = None;
                 self.screenshot_image = None;
                 Command::batch([
-                    iced::window::resize(Id::MAIN, Size::new(65., 32.)),
+                    iced::window::resize(Id::MAIN, WINDOW_SIZE),
                     iced::window::move_to(Id::MAIN, self.settings.position.into()),
                 ])
             }
@@ -161,13 +204,28 @@ impl Application for IcedApp {
                 }
                 Command::none()
             }
+            Message::Settings => {
+                self.settings_open = !self.settings_open;
+                iced::window::resize(
+                    Id::MAIN,
+                    if self.settings_open {
+                        WINDOW_SIZE_SETTINGS
+                    } else {
+                        WINDOW_SIZE
+                    },
+                )
+            }
+            Message::SettingChanged(set_function) => {
+                set_function(&mut self.settings);
+                Command::none()
+            }
         }
     }
     fn new(_flags: Self::Flags) -> (Self, iced::Command<Message>) {
         (
             Self::default(),
             Command::batch([
-                iced::window::resize(Id::MAIN, Size::new(65., 32.)),
+                iced::window::resize(Id::MAIN, WINDOW_SIZE),
                 iced::window::move_to(Id::MAIN, Self::default().settings.position.into()),
             ]),
         )
@@ -207,6 +265,7 @@ impl Default for IcedApp {
             screenshot_image: None,
 
             settings: settings,
+            settings_open: false,
         }
     }
 }
@@ -248,5 +307,22 @@ impl IcedApp {
 
         println!("Speaking {words}");
         self.tts.speak(words, false).unwrap();
+    }
+}
+
+fn settings_widget(app: &IcedApp) -> Element<'_, Message> {
+    if app.settings_open {
+        column([iced::widget::slider(
+            VoiceRate::Slowest..=VoiceRate::TooFast,
+            app.settings.rate,
+            |new_value| {
+                println!("Setting s.rate to {:?}", new_value);
+                Message::SettingChanged(Arc::new(move |s: &mut Settings| s.rate = new_value))
+            },
+        )
+        .into()])
+        .into()
+    } else {
+        horizontal_rule(0).into()
     }
 }
