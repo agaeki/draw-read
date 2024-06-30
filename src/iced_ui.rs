@@ -30,7 +30,6 @@ use iced::Command;
 use iced::ContentFit;
 use iced::Element;
 use iced::Point;
-use iced::Renderer;
 use iced::Size;
 use iced::Subscription;
 use iced::Theme;
@@ -55,7 +54,8 @@ pub enum Message {
     EndRect,
     MouseMoved(UPoint),
     Settings,
-    CancelSettings,
+    SettingsCancel,
+    SettingsApply,
     SettingChanged(Arc<dyn Fn(&mut Settings) + Send + Sync>),
     SettingError(String),
     DragWindow,
@@ -231,10 +231,19 @@ impl Application for IcedApp {
                 Command::none()
             }
             Message::DragWindow | Message::ReleaseWindow => todo!(),
-            Message::CancelSettings => todo!(),
+            Message::SettingsCancel => {
+                self.settings = Settings::default();
+                self.update(Message::Settings)
+            }
             Message::SettingError(e) => {
                 eprintln!("Error from settings: {:?}", e);
                 Command::none()
+            }
+            Message::SettingsApply => {
+                let _ = self.settings.save_to_file();
+                self.engine = iced_logic::init_engine(&self.settings);
+                self.tts = iced_logic::init_tts(&self.settings);
+                self.update(Message::Settings)
             }
         }
     }
@@ -333,6 +342,15 @@ fn settings_widget(app: &IcedApp) -> Element<'_, Message> {
         column([
             // top rule
             horizontal_rule(2).into(),
+            row([
+                widget::button("CANCEL")
+                    .on_press(Message::SettingsCancel)
+                    .into(),
+                widget::button("APPLY")
+                    .on_press(Message::SettingsApply)
+                    .into(),
+            ])
+            .into(),
             // Rate slider
             row([
                 widget::text(app.settings.rate)

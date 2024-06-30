@@ -8,6 +8,7 @@ use serde::*;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::BufReader;
+use std::io::Read;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Copy, PartialOrd, PartialEq)]
@@ -159,6 +160,31 @@ pub struct Settings {
     pub drag_draw: bool,
 }
 
+impl Settings {
+    pub fn save_to_file(&self) -> Result<(), serde_json::Error> {
+        let settings_path = Settings::get_file_path();
+        serde_json::to_writer_pretty(File::create(settings_path).unwrap(), self)
+    }
+
+    fn get_file_path() -> PathBuf {
+        if let Some(proj_dirs) = ProjectDirs::from("net", "agaeki", "draw-read") {
+            let settings_path = proj_dirs.config_dir().join("settings.json");
+            match settings_path.try_exists() {
+                Ok(false) => {
+                    let _ = std::fs::create_dir_all(proj_dirs.config_dir());
+                    File::create(settings_path.clone()).unwrap();
+                }
+                Err(e) => {
+                    eprintln!("Error finding path {:?}: {:?}", settings_path, e);
+                }
+                _ => (),
+            }
+            return settings_path;
+        }
+        panic!("Error finding project dir for settings file!");
+    }
+}
+
 impl Default for Settings {
     fn default() -> Self {
         let mut default_settings = Self {
@@ -173,31 +199,23 @@ impl Default for Settings {
             drag_draw: true,
         };
 
-        if let Some(proj_dirs) = ProjectDirs::from("net", "agaeki", "draw-read") {
-            let settings_path = proj_dirs.config_dir().join("settings.json");
-            match settings_path.try_exists() {
-                Ok(true) => {
-                    // If the file is found, read the settings from it
-                    println!("Found settings in {:?}", settings_path);
-                    default_settings =
-                        serde_json::from_reader(BufReader::new(File::open(settings_path).unwrap()))
-                            .unwrap();
-                }
-                Ok(false) => {
-                    // If not, create the file with the default settings
-                    println!("Creating settings file at {:?}", settings_path);
-                    let _ = std::fs::create_dir_all(proj_dirs.config_dir());
-                    serde_json::to_writer_pretty(
-                        File::create(settings_path).unwrap(),
-                        &default_settings,
-                    )
-                    .unwrap();
-                }
-                Err(e) => {
-                    eprintln!("Error finding path {:?}: {:?}", settings_path, e);
-                }
-            };
+        let settings_path = Settings::get_file_path();
+        let settings_string = std::fs::read_to_string(settings_path.clone()).unwrap();
+
+        match settings_string.len() {
+            0 => {
+                let _ = serde_json::to_writer_pretty(
+                    File::create(settings_path).unwrap(),
+                    &default_settings,
+                );
+            }
+            _ => {
+                default_settings =
+                    serde_json::from_reader(BufReader::new(File::open(settings_path).unwrap()))
+                        .unwrap();
+            }
         }
+
         default_settings
     }
 }
