@@ -8,19 +8,24 @@ use crate::iced_logic::get_top_left;
 use crate::iced_logic::UPoint;
 use crate::options;
 use crate::options::Settings;
+use crate::options::VoicePitch;
 use crate::options::VoiceRate;
+use iced::alignment::Horizontal;
 use iced::event;
 use iced::executor;
 use iced::widget;
 use iced::widget::button;
 use iced::widget::column;
+use iced::widget::container::Appearance;
 use iced::widget::horizontal_rule;
 use iced::widget::image::Handle;
 use iced::widget::mouse_area;
 use iced::widget::row;
 use iced::widget::text;
+use iced::widget::vertical_rule;
 use iced::window::Id;
 use iced::Application;
+use iced::Color;
 use iced::Command;
 use iced::ContentFit;
 use iced::Element;
@@ -32,7 +37,9 @@ use iced::Theme;
 use mouse_position::mouse_position::Mouse;
 use ocrs::ImageSource;
 use ocrs::OcrEngine;
+use rfd::FileDialog;
 use std::fmt::Debug;
+use std::fmt::Display;
 use std::sync::Arc;
 use tts::Tts;
 use xcap::Monitor;
@@ -48,7 +55,11 @@ pub enum Message {
     EndRect,
     MouseMoved(UPoint),
     Settings,
+    CancelSettings,
     SettingChanged(Arc<dyn Fn(&mut Settings) + Send + Sync>),
+    SettingError(String),
+    DragWindow,
+    ReleaseWindow,
 }
 
 impl Debug for Message {
@@ -219,6 +230,12 @@ impl Application for IcedApp {
                 set_function(&mut self.settings);
                 Command::none()
             }
+            Message::DragWindow | Message::ReleaseWindow => todo!(),
+            Message::CancelSettings => todo!(),
+            Message::SettingError(e) => {
+                eprintln!("Error from settings: {:?}", e);
+                Command::none()
+            }
         }
     }
     fn new(_flags: Self::Flags) -> (Self, iced::Command<Message>) {
@@ -312,17 +329,229 @@ impl IcedApp {
 
 fn settings_widget(app: &IcedApp) -> Element<'_, Message> {
     if app.settings_open {
-        column([iced::widget::slider(
-            VoiceRate::Slowest..=VoiceRate::TooFast,
-            app.settings.rate,
-            |new_value| {
-                println!("Setting s.rate to {:?}", new_value);
-                Message::SettingChanged(Arc::new(move |s: &mut Settings| s.rate = new_value))
-            },
-        )
-        .into()])
+        let rect_colour = app.settings.rect_colour.clone();
+        column([
+            // top rule
+            horizontal_rule(2).into(),
+            // Rate slider
+            row([
+                widget::text(app.settings.rate)
+                    .width(70)
+                    .horizontal_alignment(Horizontal::Right)
+                    .into(),
+                vertical_rule(2).into(),
+                iced::widget::slider(
+                    VoiceRate::Slowest..=VoiceRate::TooFast,
+                    app.settings.rate,
+                    |new_value| {
+                        if new_value != app.settings.rate {
+                            println!("Setting s.rate to {:?}", new_value);
+                            Message::SettingChanged(Arc::new(move |s: &mut Settings| {
+                                s.rate = new_value
+                            }))
+                        } else {
+                            Message::SettingChanged(Arc::new(move |_: &mut Settings| {}))
+                        }
+                    },
+                )
+                .into(),
+            ])
+            .into(),
+            // Pitch slider
+            row([
+                widget::text(app.settings.pitch)
+                    .width(70)
+                    .horizontal_alignment(Horizontal::Right)
+                    .into(),
+                vertical_rule(2).into(),
+                iced::widget::slider(
+                    VoicePitch::Soprano..=VoicePitch::Bass,
+                    app.settings.pitch,
+                    |new_value| {
+                        if new_value != app.settings.pitch {
+                            println!("Setting s.pitch to {:?}", new_value);
+                            Message::SettingChanged(Arc::new(move |s: &mut Settings| {
+                                s.pitch = new_value
+                            }))
+                        } else {
+                            Message::SettingChanged(Arc::new(move |_: &mut Settings| {}))
+                        }
+                    },
+                )
+                .into(),
+            ])
+            .into(),
+            // Volume slider
+            row([
+                widget::text(app.settings.volume)
+                    .width(70)
+                    .horizontal_alignment(Horizontal::Right)
+                    .into(),
+                vertical_rule(2).into(),
+                iced::widget::slider(0..=255, app.settings.volume, |new_value| {
+                    if new_value != app.settings.volume {
+                        println!("Setting s.volume to {:?}", new_value);
+                        Message::SettingChanged(Arc::new(move |s: &mut Settings| {
+                            s.volume = new_value
+                        }))
+                    } else {
+                        Message::SettingChanged(Arc::new(move |_: &mut Settings| {}))
+                    }
+                })
+                .into(),
+            ])
+            .into(),
+            // Rect colour picker
+            row([
+                widget::container(
+                    widget::text("Line Colour")
+                        .width(70)
+                        .horizontal_alignment(Horizontal::Right),
+                )
+                .style(move |_theme: &Theme| Appearance {
+                    background: Some(iced::Background::Color(Color::from_rgb8(
+                        rect_colour[0],
+                        rect_colour[1],
+                        rect_colour[2],
+                    ))),
+                    border: iced::Border::with_radius(1),
+                    shadow: iced::Shadow::default(),
+                    text_color: Some(
+                        Color::from_rgb8(rect_colour[0], rect_colour[1], rect_colour[2]).inverse(),
+                    ),
+                })
+                .into(),
+                vertical_rule(2).into(),
+                widget::text_input("Red", &app.settings.rect_colour[0].to_string())
+                    .on_input(|new_value| {
+                        if let Ok(new_u) = new_value.parse::<u8>() {
+                            println!("Setting s.rect_colour[0] to {:?}", new_u);
+                            Message::SettingChanged(Arc::new(move |s: &mut Settings| {
+                                s.rect_colour[0] = new_u
+                            }))
+                        } else {
+                            Message::SettingError(
+                                "Colour components must be a number 0..255".to_string(),
+                            )
+                        }
+                    })
+                    .into(),
+                widget::text_input("Green", &app.settings.rect_colour[1].to_string())
+                    .on_input(|new_value| {
+                        if let Ok(new_u) = new_value.parse::<u8>() {
+                            println!("Setting s.rect_colour[1] to {:?}", new_u);
+                            Message::SettingChanged(Arc::new(move |s: &mut Settings| {
+                                s.rect_colour[1] = new_u
+                            }))
+                        } else {
+                            Message::SettingError(
+                                "Colour components must be a number 0..255".to_string(),
+                            )
+                        }
+                    })
+                    .into(),
+                widget::text_input("Blue", &app.settings.rect_colour[2].to_string())
+                    .on_input(|new_value| {
+                        if let Ok(new_u) = new_value.parse::<u8>() {
+                            println!("Setting s.rect_colour[2] to {:?}", new_u);
+                            Message::SettingChanged(Arc::new(move |s: &mut Settings| {
+                                s.rect_colour[2] = new_u
+                            }))
+                        } else {
+                            Message::SettingError(
+                                "Colour components must be a number 0..255".to_string(),
+                            )
+                        }
+                    })
+                    .into(),
+            ])
+            .into(),
+            // Voice picker
+            row([iced::widget::pick_list(
+                app.tts
+                    .voices()
+                    .unwrap()
+                    .into_iter()
+                    .map(|v| PickableVoice(v))
+                    .collect::<Vec<_>>(),
+                Some(PickableVoice(
+                    app.tts
+                        .voices()
+                        .unwrap()
+                        .into_iter()
+                        .find(|v| v.id() == app.settings.voice)
+                        .unwrap_or(app.tts.voices().unwrap()[0].clone()),
+                )),
+                |new_value| {
+                    if new_value.0.id() != app.settings.voice {
+                        println!("Setting s.voice to {:?}", new_value);
+                        Message::SettingChanged(Arc::new(move |s: &mut Settings| {
+                            s.voice = new_value.0.id()
+                        }))
+                    } else {
+                        Message::SettingChanged(Arc::new(move |_: &mut Settings| {}))
+                    }
+                },
+            )
+            .width(200)
+            .into()])
+            .into(),
+            // Detection model picker
+            row([iced::widget::button(
+                iced::widget::text_input(
+                    "OCR Detection model",
+                    &app.settings.detection_file.to_string_lossy(),
+                )
+                .width(200),
+            )
+            .on_press(Message::SettingChanged(Arc::new(
+                move |s: &mut Settings| {
+                    if let Some(file) = FileDialog::new().add_filter("text", &["rten"]).pick_file()
+                    {
+                        s.detection_file = file;
+                    }
+                },
+            )))
+            .into()])
+            .into(),
+            // Recognition model picker
+            row([iced::widget::button(
+                iced::widget::text_input(
+                    "OCR Recognition model",
+                    &app.settings.recognition_file.to_string_lossy(),
+                )
+                .width(200),
+            )
+            .on_press(Message::SettingChanged(Arc::new(
+                move |s: &mut Settings| {
+                    if let Some(file) = FileDialog::new().add_filter("text", &["rten"]).pick_file()
+                    {
+                        s.recognition_file = file;
+                    }
+                },
+            )))
+            .into()])
+            .into(),
+            // Position picker
+            row([iced::widget::mouse_area(iced::widget::text(
+                "Click & Drag here to move window(TODO)",
+            ))
+            .on_press(Message::DragWindow)
+            .on_release(Message::ReleaseWindow)
+            .interaction(iced::mouse::Interaction::Grab)
+            .into()])
+            .into(),
+        ])
         .into()
     } else {
         horizontal_rule(0).into()
+    }
+}
+
+#[derive(PartialEq, Clone, Debug)]
+struct PickableVoice(tts::Voice);
+impl Display for PickableVoice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        f.write_str(&self.0.name())
     }
 }

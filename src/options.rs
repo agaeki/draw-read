@@ -5,11 +5,12 @@ use crate::iced_logic::UPoint;
 use directories::ProjectDirs;
 use num_traits::cast::FromPrimitive;
 use serde::*;
+use std::fmt::Display;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Copy, PartialOrd, PartialEq)]
 pub enum VoicePitch {
     Soprano,
     Mezzo,
@@ -18,6 +19,61 @@ pub enum VoicePitch {
     Tenor,
     Baritone,
     Bass,
+}
+
+impl From<u8> for VoicePitch {
+    fn from(num: u8) -> Self {
+        match num {
+            1 => VoicePitch::Soprano,
+            2 => VoicePitch::Mezzo,
+            3 => VoicePitch::Alto,
+            4 => VoicePitch::Tenor,
+            5 => VoicePitch::Baritone,
+            _ => VoicePitch::Bass,
+        }
+    }
+}
+
+impl Into<f64> for VoicePitch {
+    fn into(self) -> f64 {
+        match self {
+            VoicePitch::Soprano => 1.,
+            VoicePitch::Mezzo => 2.,
+            VoicePitch::Alto => 3.,
+            VoicePitch::Tenor => 4.,
+            VoicePitch::Baritone => 5.,
+            VoicePitch::Bass => 6.,
+        }
+    }
+}
+
+impl FromPrimitive for VoicePitch {
+    fn from_i64(num: i64) -> std::option::Option<Self> {
+        match num {
+            1 => Some(VoicePitch::Soprano),
+            2 => Some(VoicePitch::Mezzo),
+            3 => Some(VoicePitch::Alto),
+            4 => Some(VoicePitch::Tenor),
+            5 => Some(VoicePitch::Baritone),
+            _ => Some(VoicePitch::Bass),
+        }
+    }
+    fn from_u64(num: u64) -> std::option::Option<Self> {
+        match num {
+            1 => Some(VoicePitch::Soprano),
+            2 => Some(VoicePitch::Mezzo),
+            3 => Some(VoicePitch::Alto),
+            4 => Some(VoicePitch::Tenor),
+            5 => Some(VoicePitch::Baritone),
+            _ => Some(VoicePitch::Bass),
+        }
+    }
+}
+
+impl Display for VoicePitch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        f.write_str(&format!("{:?}", self).to_owned())
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Copy, PartialOrd, PartialEq)]
@@ -77,6 +133,12 @@ impl FromPrimitive for VoiceRate {
             5 => Some(VoiceRate::Fastest),
             _ => Some(VoiceRate::TooFast),
         }
+    }
+}
+
+impl Display for VoiceRate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        f.write_str(&format!("{:?}", self).to_owned())
     }
 }
 
