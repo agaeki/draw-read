@@ -17,6 +17,7 @@ use std::fmt::Display;
 use std::fs;
 use tts::Features;
 use tts::Tts;
+use xcap::Monitor;
 
 #[derive(Clone, Debug, Copy, Default, Serialize, Deserialize)]
 pub struct ScreenPoint {
@@ -195,8 +196,8 @@ pub fn get_cropped_image_source<'a>(
 ) -> (Vec<u8>, u32, u32) {
     let (width, height) = screenshot_size;
 
-    let first_corner_img_coords = get_image_coords_i(first_corner, screenshot_size);
-    let second_corner_img_coords = get_image_coords_i(second_corner, screenshot_size);
+    let first_corner_img_coords = get_image_coords(first_corner, screenshot_size);
+    let second_corner_img_coords = get_image_coords(second_corner, screenshot_size);
 
     let rect_start = get_top_left(first_corner_img_coords, second_corner_img_coords);
     let rect_end = get_bottom_right(first_corner_img_coords, second_corner_img_coords);
@@ -226,10 +227,12 @@ pub fn get_bottom_right(point1: ImagePoint, point2: ImagePoint) -> ImagePoint {
     }
 }
 
-pub fn get_image_coords_i(point: ScreenPoint, image_size: (u32, u32)) -> ImagePoint {
+pub fn get_image_coords(point: ScreenPoint, image_size: (u32, u32)) -> ImagePoint {
+    let x_origin_shift = if point.x < 0 { image_size.0 as i32 } else { 0 };
+    let y_origin_shift = if point.y < 0 { image_size.1 as i32 } else { 0 };
     ImagePoint {
-        x: (point.x % image_size.0 as i32) as u32,
-        y: (point.y % image_size.1 as i32) as u32,
+        x: (point.x % image_size.0 as i32 + x_origin_shift) as u32,
+        y: (point.y % image_size.1 as i32 + y_origin_shift) as u32,
     }
 }
 
@@ -259,5 +262,22 @@ pub fn draw_rectangle(
 
         buffer[top_index..top_index + 4].clone_from_slice(colour);
         buffer[bottom_index..bottom_index + 4].clone_from_slice(colour);
+    }
+}
+
+pub fn get_mouse_position() -> Option<ScreenPoint> {
+    match Mouse::get_mouse_position() {
+        Mouse::Position { x, y } => {
+            let monitor = &Monitor::from_point(x, y).unwrap();
+
+            Some(ScreenPoint {
+                x: (x as f32 / monitor.scale_factor()).round() as i32,
+                y: (y as f32 / monitor.scale_factor()).round() as i32,
+            })
+        }
+        mouse_position::mouse_position::Mouse::Error => {
+            eprintln!("Mouse error!");
+            None
+        }
     }
 }

@@ -33,7 +33,6 @@ use iced::Point;
 use iced::Size;
 use iced::Subscription;
 use iced::Theme;
-use mouse_position::mouse_position::Mouse;
 use ocrs::ImageSource;
 use ocrs::OcrEngine;
 use rfd::FileDialog;
@@ -142,7 +141,7 @@ impl Application for IcedApp {
         match message {
             Message::Read => {
                 println!("Read clicked");
-                if let Mouse::Position { x, y } = Mouse::get_mouse_position() {
+                if let Some(ScreenPoint { x, y }) = iced_logic::get_mouse_position() {
                     let monitor = &Monitor::from_point(x, y).unwrap();
                     let rgb_image = monitor.capture_image().unwrap();
 
@@ -151,10 +150,21 @@ impl Application for IcedApp {
                             Id::MAIN,
                             Size::new(rgb_image.width() as f32, rgb_image.height() as f32),
                         ),
-                        iced::window::move_to(Id::MAIN, Point::new(0., 0.)),
+                        iced::window::move_to(
+                            Id::MAIN,
+                            Point::new(monitor.x() as f32, monitor.y() as f32),
+                        ),
                     ]);
 
-                    self.screenshot_size = (rgb_image.width(), rgb_image.height());
+                    println!(
+                        "Monitor {:?} scale_factor is {:?}",
+                        monitor,
+                        monitor.scale_factor()
+                    );
+                    self.screenshot_size = (
+                        (rgb_image.width() as f32 / monitor.scale_factor()).round() as u32,
+                        (rgb_image.height() as f32 / monitor.scale_factor()).round() as u32,
+                    );
 
                     // Store original screenshot so that we can draw a resizing rectangle on a clone without losing pixels
                     self.screenshot_buffer = rgb_image.into_raw();
@@ -167,7 +177,7 @@ impl Application for IcedApp {
                 }
             }
             Message::StartRect => {
-                if let Mouse::Position { x, y } = Mouse::get_mouse_position() {
+                if let Some(ScreenPoint { x, y }) = iced_logic::get_mouse_position() {
                     println!("Start rect at {x} {y}");
                     self.rect_start = Some(ScreenPoint { x: x, y: y });
                 }
@@ -198,8 +208,8 @@ impl Application for IcedApp {
                     self.rect_end = Some(pos);
                     screenshot_image.copy_from_slice(&self.screenshot_buffer[..]);
                     let img_coord_start =
-                        iced_logic::get_image_coords_i(rect_start, self.screenshot_size);
-                    let img_coord_end = iced_logic::get_image_coords_i(pos, self.screenshot_size);
+                        iced_logic::get_image_coords(rect_start, self.screenshot_size);
+                    let img_coord_end = iced_logic::get_image_coords(pos, self.screenshot_size);
 
                     draw_rectangle(
                         &mut self.screenshot_image.as_mut().unwrap(),
@@ -247,7 +257,7 @@ impl Application for IcedApp {
                 Command::none()
             }
             Message::DragWindow => {
-                if let Mouse::Position { x, y } = Mouse::get_mouse_position() {
+                if let Some(ScreenPoint { x, y }) = iced_logic::get_mouse_position() {
                     println!("Start drag at {x} {y}");
                     self.previous_drag_position = Some(ScreenPoint { x: x, y: y });
                 }
@@ -289,14 +299,10 @@ impl Application for IcedApp {
     fn subscription(&self) -> Subscription<Message> {
         event::listen_with(|evt, _| {
             if let iced::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) = evt {
-                match Mouse::get_mouse_position() {
-                    Mouse::Position { x, y } => {
-                        Some(Message::MouseMoved(ScreenPoint { x: x, y: y }))
-                    }
-                    mouse_position::mouse_position::Mouse::Error => {
-                        eprintln!("Mouse error!");
-                        None
-                    }
+                if let Some(p) = iced_logic::get_mouse_position() {
+                    Some(Message::MouseMoved(p))
+                } else {
+                    None
                 }
             } else {
                 None
@@ -585,6 +591,7 @@ fn settings_widget(app: &IcedApp) -> Element<'_, Message> {
             ))
             .on_press(Message::DragWindow)
             .on_release(Message::ReleaseWindow)
+            .on_exit(Message::ReleaseWindow)
             .interaction(iced::mouse::Interaction::Grab)
             .into()])
             .into(),
