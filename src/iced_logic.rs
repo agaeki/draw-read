@@ -7,28 +7,63 @@ use crate::options::VoiceRate;
 use image::imageops;
 use image::ImageBuffer;
 use image::SubImage;
+use mouse_position::mouse_position::Mouse;
 use ocrs::OcrEngine;
 use ocrs::OcrEngineParams;
 use rten::Model;
 use serde::*;
 use std::cmp;
+use std::fmt::Display;
 use std::fs;
 use tts::Features;
 use tts::Tts;
 
 #[derive(Clone, Debug, Copy, Default, Serialize, Deserialize)]
-pub struct UPoint {
-    pub x: u32,
-    pub y: u32,
+pub struct ScreenPoint {
+    pub x: i32,
+    pub y: i32,
 }
 
-impl Into<iced::Point> for UPoint {
+impl Into<iced::Point> for ScreenPoint {
     fn into(self) -> iced::Point {
         iced::Point {
             x: self.x as f32,
             y: self.y as f32,
         }
     }
+}
+
+impl From<iced::Point> for ScreenPoint {
+    fn from(fr: iced::Point) -> Self {
+        Self {
+            x: fr.x as i32,
+            y: fr.y as i32,
+        }
+    }
+}
+
+impl From<Mouse> for ScreenPoint {
+    fn from(fr: Mouse) -> Self {
+        match fr {
+            Mouse::Position { x, y } => Self { x: x, y: y },
+            mouse_position::mouse_position::Mouse::Error => {
+                eprintln!("Error from mouse_position!");
+                Self::default()
+            }
+        }
+    }
+}
+
+impl Display for ScreenPoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        f.write_str(&format!("{:?}", self))
+    }
+}
+
+#[derive(Clone, Debug, Copy, Default, Serialize, Deserialize)]
+pub struct ImagePoint {
+    pub x: u32,
+    pub y: u32,
 }
 
 pub fn init_engine(settings: &options::Settings) -> OcrEngine {
@@ -155,18 +190,19 @@ pub fn init_tts(settings: &options::Settings) -> Tts {
 pub fn get_cropped_image_source<'a>(
     screenshot: Vec<u8>,
     screenshot_size: (u32, u32),
-    first_corner: UPoint,
-    second_corner: UPoint,
+    first_corner: ScreenPoint,
+    second_corner: ScreenPoint,
 ) -> (Vec<u8>, u32, u32) {
     let (width, height) = screenshot_size;
 
-    let rect_start = get_top_left(first_corner, second_corner);
-    let rect_end = get_bottom_right(first_corner, second_corner);
+    let first_corner_img_coords = get_image_coords_i(first_corner, screenshot_size);
+    let second_corner_img_coords = get_image_coords_i(second_corner, screenshot_size);
 
-    let (new_width, new_height) = (
-        rect_end.x as u32 - rect_start.x,
-        rect_end.y as u32 - rect_start.y,
-    );
+    let rect_start = get_top_left(first_corner_img_coords, second_corner_img_coords);
+    let rect_end = get_bottom_right(first_corner_img_coords, second_corner_img_coords);
+
+    let (new_width, new_height) = (rect_end.x - rect_start.x, rect_end.y - rect_start.y);
+
     let raw_img = ImageBuffer::from_raw(width, height, screenshot).unwrap();
     let cropped_buf: SubImage<&ImageBuffer<image::Rgba<u8>, Vec<u8>>> =
         imageops::crop_imm(&raw_img, rect_start.x, rect_start.y, new_width, new_height);
@@ -176,25 +212,32 @@ pub fn get_cropped_image_source<'a>(
     (cropped_buf.to_image().into_raw(), new_width, new_height)
 }
 
-pub fn get_top_left(point1: UPoint, point2: UPoint) -> UPoint {
-    UPoint {
+pub fn get_top_left(point1: ImagePoint, point2: ImagePoint) -> ImagePoint {
+    ImagePoint {
         x: cmp::min(point1.x, point2.x),
         y: cmp::min(point1.y, point2.y),
     }
 }
 
-pub fn get_bottom_right(point1: UPoint, point2: UPoint) -> UPoint {
-    UPoint {
+pub fn get_bottom_right(point1: ImagePoint, point2: ImagePoint) -> ImagePoint {
+    ImagePoint {
         x: cmp::max(point1.x, point2.x),
         y: cmp::max(point1.y, point2.y),
+    }
+}
+
+pub fn get_image_coords_i(point: ScreenPoint, image_size: (u32, u32)) -> ImagePoint {
+    ImagePoint {
+        x: (point.x % image_size.0 as i32) as u32,
+        y: (point.y % image_size.1 as i32) as u32,
     }
 }
 
 pub fn draw_rectangle(
     buffer: &mut [u8],
     size: (u32, u32),
-    start: UPoint,
-    end: UPoint,
+    start: ImagePoint,
+    end: ImagePoint,
     colour: &[u8; 4],
 ) {
     // Work out the indices of the edges of the rectangle in the 1D vec of image data, *4 because a pixel is RGBA

@@ -5,7 +5,7 @@ use crate::iced_logic;
 use crate::iced_logic::draw_rectangle;
 use crate::iced_logic::get_bottom_right;
 use crate::iced_logic::get_top_left;
-use crate::iced_logic::UPoint;
+use crate::iced_logic::ScreenPoint;
 use crate::options;
 use crate::options::Settings;
 use crate::options::VoicePitch;
@@ -52,7 +52,7 @@ pub enum Message {
     Stop,
     StartRect,
     EndRect,
-    MouseMoved(UPoint),
+    MouseMoved(ScreenPoint),
     Settings,
     SettingsCancel,
     SettingsApply,
@@ -73,11 +73,13 @@ pub struct IcedApp {
     pub tts: Tts,
     pub screenshot_buffer: Vec<u8>,
     pub screenshot_size: (u32, u32),
-    pub rect_start: Option<UPoint>,
-    pub rect_end: Option<UPoint>,
+    pub rect_start: Option<ScreenPoint>,
+    pub rect_end: Option<ScreenPoint>,
 
     pub screenshot_image: Option<Vec<u8>>,
+
     pub settings_open: bool,
+    pub previous_drag_position: Option<ScreenPoint>,
 
     pub settings: options::Settings,
 }
@@ -167,10 +169,7 @@ impl Application for IcedApp {
             Message::StartRect => {
                 if let Mouse::Position { x, y } = Mouse::get_mouse_position() {
                     println!("Start rect at {x} {y}");
-                    self.rect_start = Some(UPoint {
-                        x: x as u32,
-                        y: y as u32,
-                    });
+                    self.rect_start = Some(ScreenPoint { x: x, y: y });
                 }
                 Command::none()
             }
@@ -181,8 +180,8 @@ impl Application for IcedApp {
                     self.speak_from_rect(
                         self.screenshot_buffer.clone(),
                         self.screenshot_size,
-                        rect_start,
-                        rect_end,
+                        rect_start.into(),
+                        rect_end.into(),
                     );
                 }
                 self.rect_start = None;
@@ -193,19 +192,36 @@ impl Application for IcedApp {
                 ])
             }
             Message::MouseMoved(pos) => {
-                self.rect_end = Some(pos);
                 if let Some(rect_start) = self.rect_start
-                    && let Some(rect_end) = self.rect_end
                     && let Some(screenshot_image) = &mut self.screenshot_image
                 {
+                    self.rect_end = Some(pos);
                     screenshot_image.copy_from_slice(&self.screenshot_buffer[..]);
+                    let img_coord_start =
+                        iced_logic::get_image_coords_i(rect_start, self.screenshot_size);
+                    let img_coord_end = iced_logic::get_image_coords_i(pos, self.screenshot_size);
+
                     draw_rectangle(
                         &mut self.screenshot_image.as_mut().unwrap(),
                         self.screenshot_size,
-                        get_top_left(rect_start, rect_end),
-                        get_bottom_right(rect_start, rect_end),
+                        get_top_left(img_coord_start, img_coord_end),
+                        get_bottom_right(img_coord_start, img_coord_end),
                         &self.settings.rect_colour,
                     );
+                    return Command::none();
+                } else if let Some(previous_pos) = self.previous_drag_position {
+                    let x_diff = pos.x - previous_pos.x;
+                    let y_diff = pos.y - previous_pos.y;
+
+                    let new_position = ScreenPoint {
+                        x: self.settings.position.x + x_diff,
+                        y: self.settings.position.y + y_diff,
+                    };
+                    println!("xdiff {x_diff} ydiff {y_diff} new_pos {new_position}");
+
+                    self.previous_drag_position = Some(pos.into());
+                    self.settings.position = new_position;
+                    return iced::window::move_to(Id::MAIN, self.settings.position.into());
                 }
                 Command::none()
             }
@@ -230,7 +246,17 @@ impl Application for IcedApp {
                 set_function(&mut self.settings);
                 Command::none()
             }
-            Message::DragWindow | Message::ReleaseWindow => todo!(),
+            Message::DragWindow => {
+                if let Mouse::Position { x, y } = Mouse::get_mouse_position() {
+                    println!("Start drag at {x} {y}");
+                    self.previous_drag_position = Some(ScreenPoint { x: x, y: y });
+                }
+                Command::none()
+            }
+            Message::ReleaseWindow => {
+                self.previous_drag_position = None;
+                Command::none()
+            }
             Message::SettingsCancel => {
                 self.settings = Settings::default();
                 self.update(Message::Settings)
@@ -262,14 +288,8 @@ impl Application for IcedApp {
 
     fn subscription(&self) -> Subscription<Message> {
         event::listen_with(|evt, _| {
-            if let iced::Event::Mouse(iced::mouse::Event::CursorMoved {
-                position: Point { x, y },
-            }) = evt
-            {
-                Some(Message::MouseMoved(UPoint {
-                    x: x as u32,
-                    y: y as u32,
-                }))
+            if let iced::Event::Mouse(iced::mouse::Event::CursorMoved { position }) = evt {
+                Some(Message::MouseMoved(position.into()))
             } else {
                 None
             }
@@ -292,6 +312,7 @@ impl Default for IcedApp {
 
             settings: settings,
             settings_open: false,
+            previous_drag_position: None,
         }
     }
 }
@@ -301,8 +322,8 @@ impl IcedApp {
         &mut self,
         screenshot: Vec<u8>,
         screenshot_size: (u32, u32),
-        first_corner: UPoint,
-        second_corner: UPoint,
+        first_corner: ScreenPoint,
+        second_corner: ScreenPoint,
     ) {
         let (img_source_bytes, new_width, new_height) = iced_logic::get_cropped_image_source(
             screenshot,

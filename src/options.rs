@@ -1,14 +1,13 @@
 // This file is part of draw-read
 // Copyright (C) 2024 agaeki
 
-use crate::iced_logic::UPoint;
+use crate::iced_logic::ScreenPoint;
 use directories::ProjectDirs;
 use num_traits::cast::FromPrimitive;
 use serde::*;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::BufReader;
-use std::io::Read;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Copy, PartialOrd, PartialEq)]
@@ -155,7 +154,7 @@ pub struct Settings {
     pub rate: VoiceRate,
     pub voice: String,
 
-    pub position: UPoint,
+    pub position: ScreenPoint,
 
     pub drag_draw: bool,
 }
@@ -195,7 +194,7 @@ impl Default for Settings {
             pitch: VoicePitch::default(),
             rate: VoiceRate::default(),
             voice: String::default(),
-            position: UPoint::default(),
+            position: ScreenPoint::default(),
             drag_draw: true,
         };
 
