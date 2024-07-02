@@ -288,8 +288,16 @@ impl Application for IcedApp {
 
     fn subscription(&self) -> Subscription<Message> {
         event::listen_with(|evt, _| {
-            if let iced::Event::Mouse(iced::mouse::Event::CursorMoved { position }) = evt {
-                Some(Message::MouseMoved(position.into()))
+            if let iced::Event::Mouse(iced::mouse::Event::CursorMoved { .. }) = evt {
+                match Mouse::get_mouse_position() {
+                    Mouse::Position { x, y } => {
+                        Some(Message::MouseMoved(ScreenPoint { x: x, y: y }))
+                    }
+                    mouse_position::mouse_position::Mouse::Error => {
+                        eprintln!("Mouse error!");
+                        None
+                    }
+                }
             } else {
                 None
             }
