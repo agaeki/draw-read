@@ -156,11 +156,6 @@ impl Application for IcedApp {
                         ),
                     ]);
 
-                    println!(
-                        "Monitor {:?} scale_factor is {:?}",
-                        monitor,
-                        monitor.scale_factor()
-                    );
                     self.screenshot_size = (
                         (rgb_image.width() as f32 / monitor.scale_factor()).round() as u32,
                         (rgb_image.height() as f32 / monitor.scale_factor()).round() as u32,
@@ -227,7 +222,6 @@ impl Application for IcedApp {
                         x: self.settings.position.x + x_diff,
                         y: self.settings.position.y + y_diff,
                     };
-                    println!("xdiff {x_diff} ydiff {y_diff} new_pos {new_position}");
 
                     self.previous_drag_position = Some(pos.into());
                     self.settings.position = new_position;
