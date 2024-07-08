@@ -34,8 +34,8 @@ impl From<u8> for VoicePitch {
     }
 }
 
-impl Into<f64> for VoicePitch {
-    fn into(self) -> f64 {
+impl Into<f32> for VoicePitch {
+    fn into(self) -> f32 {
         match self {
             VoicePitch::Soprano => 1.,
             VoicePitch::Mezzo => 2.,
@@ -44,6 +44,11 @@ impl Into<f64> for VoicePitch {
             VoicePitch::Baritone => 5.,
             VoicePitch::Bass => 6.,
         }
+    }
+}
+impl Into<f64> for VoicePitch {
+    fn into(self) -> f64 {
+        Into::<f32>::into(self) as f64
     }
 }
 
@@ -100,8 +105,8 @@ impl From<u8> for VoiceRate {
     }
 }
 
-impl Into<f64> for VoiceRate {
-    fn into(self) -> f64 {
+impl Into<f32> for VoiceRate {
+    fn into(self) -> f32 {
         match self {
             VoiceRate::Slowest => 1.,
             VoiceRate::Slow => 2.,
@@ -110,6 +115,11 @@ impl Into<f64> for VoiceRate {
             VoiceRate::Fastest => 5.,
             VoiceRate::TooFast => 6.,
         }
+    }
+}
+impl Into<f64> for VoiceRate {
+    fn into(self) -> f64 {
+        Into::<f32>::into(self) as f64
     }
 }
 

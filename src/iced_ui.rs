@@ -42,7 +42,7 @@ use std::sync::Arc;
 use tts::Tts;
 use xcap::Monitor;
 
-pub const WINDOW_SIZE: Size = Size::new(100., 32.);
+pub const WINDOW_SIZE: Size = Size::new(80., 31.);
 pub const WINDOW_SIZE_SETTINGS: Size = Size::new(200., 400.);
 
 #[derive(Clone)]
@@ -78,6 +78,7 @@ pub struct IcedApp {
     pub screenshot_image: Option<Vec<u8>>,
 
     pub settings_open: bool,
+    pub settings_dirty: bool,
     pub previous_drag_position: Option<ScreenPoint>,
 
     pub settings: options::Settings,
@@ -247,6 +248,7 @@ impl Application for IcedApp {
                 )
             }
             Message::SettingChanged(set_function) => {
+                self.settings_dirty = true;
                 set_function(&mut self.settings);
                 Command::none()
             }
@@ -263,6 +265,7 @@ impl Application for IcedApp {
             }
             Message::SettingsCancel => {
                 self.settings = Settings::default();
+                self.settings_dirty = false;
                 self.update(Message::Settings)
             }
             Message::SettingError(e) => {
@@ -273,6 +276,7 @@ impl Application for IcedApp {
                 let _ = self.settings.save_to_file();
                 self.engine = iced_logic::init_engine(&self.settings);
                 self.tts = iced_logic::init_tts(&self.settings);
+                self.settings_dirty = false;
                 self.update(Message::Settings)
             }
         }
@@ -320,6 +324,7 @@ impl Default for IcedApp {
 
             settings: settings,
             settings_open: false,
+            settings_dirty: false,
             previous_drag_position: None,
         }
     }
@@ -371,15 +376,19 @@ fn settings_widget(app: &IcedApp) -> Element<'_, Message> {
         column([
             // top rule
             horizontal_rule(2).into(),
-            row([
-                widget::button("CANCEL")
-                    .on_press(Message::SettingsCancel)
-                    .into(),
-                widget::button("APPLY")
-                    .on_press(Message::SettingsApply)
-                    .into(),
-            ])
-            .into(),
+            if app.settings_dirty {
+                row([
+                    widget::button("CANCEL")
+                        .on_press(Message::SettingsCancel)
+                        .into(),
+                    widget::button("APPLY")
+                        .on_press(Message::SettingsApply)
+                        .into(),
+                ])
+                .into()
+            } else {
+                horizontal_rule(0).into()
+            },
             // Rate slider
             row([
                 widget::text(app.settings.rate)

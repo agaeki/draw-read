@@ -2,7 +2,6 @@
 // Copyright (C) 2024 agaeki
 
 use crate::options;
-use crate::options::VoicePitch;
 use crate::options::VoiceRate;
 use image::imageops;
 use image::ImageBuffer;
@@ -118,14 +117,7 @@ pub fn init_tts(settings: &options::Settings) -> Tts {
     }
 
     let pitch_coefficient = (inner_tts.max_pitch() - inner_tts.min_pitch()) / 6.;
-    let pitch_multiplier = match &settings.pitch {
-        VoicePitch::Soprano => 6.,
-        VoicePitch::Mezzo => 5.,
-        VoicePitch::Alto => 4.,
-        VoicePitch::Tenor => 3.,
-        VoicePitch::Baritone => 2.,
-        VoicePitch::Bass => 1.,
-    };
+    let pitch_multiplier: f32 = settings.pitch.into();
     println!(
         "Setting pitch to {:?}",
         inner_tts.min_pitch() + pitch_multiplier * pitch_coefficient
@@ -140,26 +132,28 @@ pub fn init_tts(settings: &options::Settings) -> Tts {
         .set_pitch(inner_tts.min_pitch() + pitch_multiplier * pitch_coefficient)
         .unwrap();
 
-    let rate_coefficient = (inner_tts.max_rate() - inner_tts.min_rate()) / 6.;
-    let rate_multiplier = match &settings.rate {
-        // Windows rate goes non-linearly from 0.5 to 6.0 with 1 as the default. Delineations are approximate.
-        VoiceRate::Slowest => 0.4545,
-        VoiceRate::Slow => 0.6,
-        VoiceRate::Default => 0.909,
-        VoiceRate::Fast => 3.18,
-        VoiceRate::Fastest => 5.45,
-        VoiceRate::TooFast => 5.45,
-    };
-    println!("Setting rate to {:?}", rate_multiplier * rate_coefficient);
     println!(
         "Rate goes from {:?} through {:?} to {:?}",
         inner_tts.min_rate(),
         inner_tts.normal_rate(),
         inner_tts.max_rate()
     );
-    inner_tts
-        .set_rate(rate_multiplier * rate_coefficient)
-        .unwrap();
+    if settings.rate < VoiceRate::Default {
+        let rate_coefficient = (inner_tts.normal_rate() - inner_tts.min_rate()) / 2.;
+        let rate_multiplier: f32 = Into::<f32>::into(settings.rate) - 1.;
+
+        let rate = inner_tts.min_rate() + (rate_coefficient * rate_multiplier);
+        println!("Setting rate to {:?}", rate);
+        inner_tts.set_rate(rate).unwrap();
+    } else if settings.rate > VoiceRate::Default {
+        let rate_coefficient = (inner_tts.max_rate() - inner_tts.normal_rate()) / 3.;
+        let rate_multiplier: f32 =
+            Into::<f32>::into(settings.rate) - Into::<f32>::into(VoiceRate::Default) - 1.;
+
+        let rate = inner_tts.normal_rate() + (rate_coefficient * rate_multiplier);
+        println!("Setting rate to {:?}", rate);
+        inner_tts.set_rate(rate).unwrap();
+    }
 
     let volume_coefficient = (inner_tts.max_volume() - inner_tts.min_volume()) / 255.;
     println!(
