@@ -26,8 +26,8 @@ edition = "2021"
 ocrs = "0.8.0"
 image = {version = "0.25.1", features=["bmp"]}
 xcap = "0.0.10"
-rten = "*"
-rten-imageproc = "*"
+rten = "0.10.0"
+rten-imageproc = "0.10.0"
 mouse_position = "0.1.4"
 tts = "0.26.1"
 iced = { version = "0.12.1", features = ["advanced", "image"] }
