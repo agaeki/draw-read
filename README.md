@@ -15,6 +15,8 @@ DrawRead is an accessibility tool that can read out any text you can see on scre
 
 Machine Learning is an imprecise art, text recognition is not always perfect. DrawRead has been tested on simple PC fonts - very curly fonts or handwriting will be more difficult for it to read.
 
+This is an early version of DrawRead, please open a GitHub issue for any problems you have while using it to help refine the text recognition model.
+
 ## Documentation
 
 
