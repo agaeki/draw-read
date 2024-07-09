@@ -118,32 +118,15 @@ pub fn init_tts(settings: &options::Settings) -> Tts {
 
     let pitch_coefficient = (inner_tts.max_pitch() - inner_tts.min_pitch()) / 6.;
     let pitch_multiplier: f32 = settings.pitch.into();
-    println!(
-        "Setting pitch to {:?}",
-        inner_tts.min_pitch() + pitch_multiplier * pitch_coefficient
-    );
-    println!(
-        "Pitch goes from {:?} through {:?} to {:?}",
-        inner_tts.min_pitch(),
-        inner_tts.normal_pitch(),
-        inner_tts.max_pitch()
-    );
     inner_tts
         .set_pitch(inner_tts.min_pitch() + pitch_multiplier * pitch_coefficient)
         .unwrap();
 
-    println!(
-        "Rate goes from {:?} through {:?} to {:?}",
-        inner_tts.min_rate(),
-        inner_tts.normal_rate(),
-        inner_tts.max_rate()
-    );
     if settings.rate < VoiceRate::Default {
         let rate_coefficient = (inner_tts.normal_rate() - inner_tts.min_rate()) / 2.;
         let rate_multiplier: f32 = Into::<f32>::into(settings.rate) - 1.;
 
         let rate = inner_tts.min_rate() + (rate_coefficient * rate_multiplier);
-        println!("Setting rate to {:?}", rate);
         inner_tts.set_rate(rate).unwrap();
     } else if settings.rate > VoiceRate::Default {
         let rate_coefficient = (inner_tts.max_rate() - inner_tts.normal_rate()) / 3.;
@@ -151,21 +134,10 @@ pub fn init_tts(settings: &options::Settings) -> Tts {
             Into::<f32>::into(settings.rate) - Into::<f32>::into(VoiceRate::Default) - 1.;
 
         let rate = inner_tts.normal_rate() + (rate_coefficient * rate_multiplier);
-        println!("Setting rate to {:?}", rate);
         inner_tts.set_rate(rate).unwrap();
     }
 
     let volume_coefficient = (inner_tts.max_volume() - inner_tts.min_volume()) / 255.;
-    println!(
-        "Setting volume to {:?}",
-        settings.volume as f32 * volume_coefficient
-    );
-    println!(
-        "Volume goes from {:?} through {:?} to {:?}",
-        inner_tts.min_volume(),
-        inner_tts.normal_volume(),
-        inner_tts.max_volume()
-    );
     inner_tts
         .set_volume(settings.volume as f32 * volume_coefficient)
         .unwrap();

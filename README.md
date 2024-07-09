@@ -4,16 +4,23 @@
 
 ## DrawRead - MachineLearning-Powered Assistive Screen Reader
 
-DrawRead is an accessibility tool that can read out any text you can see on screen. Text on screen, can't work out what it says? Click READ, draw a box around it, find out in moments!
+DrawRead is an accessibility tool that can read out any text you can see on screen. If you have text on screen, but can't work out what it says? Click READ, draw a box around it, have it read
 
 - Read anything on screen, not just supported applications or browsers
 - No copy and pasting
 - Streamlined workflow
 
+
+### Caveats
+
+Machine Learning is an imprecise art, text recognition is not always perfect. DrawRead has been tested on simple PC fonts - very curly fonts or handwriting will be more difficult for it to read.
+
 ## Documentation
 
 
 ## Discussion
+
+If you have questions or feedback, please open a GitHub issue in this project.
 
 
 ## License
