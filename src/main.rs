@@ -2,6 +2,7 @@
 // Copyright (C) 2024 agaeki
 
 #![feature(let_chains)]
+use iced::window::Level;
 use iced::Application;
 use iced::Error;
 use iced::Size;
@@ -20,6 +21,7 @@ fn main() -> Result<(), Error> {
     settings.window.size = Size::new(65., 32.);
     settings.window.resizable = false;
     settings.window.decorations = false;
+    settings.window.level = Level::AlwaysOnTop;
 
     IcedApp::run(settings)?;
 

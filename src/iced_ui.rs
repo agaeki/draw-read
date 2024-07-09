@@ -42,7 +42,7 @@ use std::sync::Arc;
 use tts::Tts;
 use xcap::Monitor;
 
-pub const WINDOW_SIZE: Size = Size::new(80., 31.);
+pub const WINDOW_SIZE: Size = Size::new(108., 31.);
 pub const WINDOW_SIZE_SETTINGS: Size = Size::new(200., 400.);
 
 #[derive(Clone)]
@@ -59,6 +59,7 @@ pub enum Message {
     SettingError(String),
     DragWindow,
     ReleaseWindow,
+    Quit,
 }
 
 impl Debug for Message {
@@ -108,6 +109,11 @@ impl Application for IcedApp {
             column([
                 row([
                     button(widget::image(Handle::from_memory(include_bytes!(
+                        "quit_image.png"
+                    ))))
+                    .on_press(Message::Quit)
+                    .into(),
+                    button(widget::image(Handle::from_memory(include_bytes!(
                         "gear_image.png"
                     ))))
                     .on_press(Message::Settings)
@@ -121,6 +127,11 @@ impl Application for IcedApp {
         } else if let Ok(true) = self.tts.is_speaking() {
             column([
                 row([
+                    button(widget::image(Handle::from_memory(include_bytes!(
+                        "quit_image.png"
+                    ))))
+                    .on_press(Message::Quit)
+                    .into(),
                     button(widget::image(Handle::from_memory(include_bytes!(
                         "gear_image.png"
                     ))))
@@ -279,6 +290,7 @@ impl Application for IcedApp {
                 self.settings_dirty = false;
                 self.update(Message::Settings)
             }
+            Message::Quit => iced::window::close(Id::MAIN),
         }
     }
     fn new(_flags: Self::Flags) -> (Self, iced::Command<Message>) {
